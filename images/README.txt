@@ -1,4 +1,5 @@
-PNGs generated from the Merida Chess Font, downloaded from 
+PNGs generated from the Merida Chess Font.  SVGs for 
+this font were downloaded from 
 
     https://lichess.org,
 

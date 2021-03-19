@@ -35,6 +35,7 @@ class GameState():
         self.checks = []
         self.in_check = False
         self.stalemate_counter = 0
+        self.enpassant = False
         
     def make_new_move(self, move):
         '''
@@ -62,17 +63,32 @@ class GameState():
         
         Does not work for castling, en passant, or pawn promotion.
         '''
-        if move.piece_captured != None:
+        if move.contains_enpassant():
+            move.piece_captured = move.enpassant_square.get_piece()
+            move.enpassant_square.remove_piece()
+        elif move.piece_captured != None:
             move.end_square.remove_piece()
         move.start_square.remove_piece()
         if move.contains_promotion():
             move.end_square.set_piece(move.promotion_piece)
+        elif move.contains_castle():
+            rook, rookStartSquare, rookEndSquare = move.castle
+            rookStartSquare.remove_piece()
+            rookEndSquare.set_piece(rook)
+            move.end_square.set_piece(move.piece_moved)
         else:
             move.end_square.set_piece(move.piece_moved)
+        
         
         self.move_log.append((move, self.stalemate_counter))
         if not move.piece_moved.has_moved():
             move.piece_moved.first_move = move
+            if (move.piece_moved.get_name() == 'Pawn'
+                and (abs(move.end_square.get_rank() 
+                         - move.start_square.get_rank()) == 2)):
+                self.enpassant = True
+            elif self.enpassant:
+                self.enpassant = False
         
         self.white_to_move = not self.white_to_move
         if self.white_to_move:
@@ -81,6 +97,7 @@ class GameState():
         
         # For debugging moves.
         print(move.get_chess_notation(), end=' ')
+        print(self.enpassant)
     
     def undo_move(self):
         '''Method to undo a chess move.'''
@@ -91,9 +108,18 @@ class GameState():
             move.end_square.remove_piece()
             move.start_square.set_piece(move.piece_moved)
             if move.piece_captured != None:
-                move.end_square.set_piece(move.piece_captured)
+                if move.contains_enpassant():
+                    move.enpassant_square.set_piece(move.piece_captured)
+                    self.enpassant = True
+                else:
+                    move.end_square.set_piece(move.piece_captured)
+                    self.enpassant = False
             if move == move.piece_moved.get_first_move():
                 move.piece_moved.first_move = None
+            if move.contains_castle():
+                rook, rookStartSquare, rookEndSquare = move.castle
+                rookEndSquare.remove_piece()
+                rookStartSquare.set_piece(rook)
             
             self.white_to_move = not self.white_to_move
             if not self.white_to_move:
@@ -188,10 +214,65 @@ class GameState():
         # Remove all moves that put the King in check.
         for move in reversed(moves):
             if move.piece_moved.get_name() == 'King':
+                # If the move puts the King in check, remove that move from the
+                # valid moves list.
                 if self.get_pins_and_checks(king, move.end_square)[0]:
                     moves.remove(move)
         
+        if not king.has_moved() and not self.in_check:
+            self.get_castle_moves(king, moves)
+            # Remove all moves that put the King in check.
+            for move in reversed(moves):
+                if move.piece_moved.get_name() == 'King':
+                    if self.get_pins_and_checks(king, move.end_square)[0]:
+                        moves.remove(move)
+            
+                    
+        
         return moves
+    
+    def get_castle_moves(self, king, moves):
+        '''Adds castling moves to valid moves.'''
+        s = self.board.squares
+        kingFile, kingRank = king.get_coords()
+        kingSquare = king.get_square()
+        for move in moves:
+            if move.piece_moved.get_name() == 'King':
+                # Look to the left and right of the King for potential 
+                # castling squares.
+                for x, _ in DIRECTIONS['HORIZONTAL']:
+                    rookSquare = s[kingFile + x, kingRank]
+                    # If the king can't move to the first square to the 
+                    # side, he can't castle, move on to the next direction.
+                    if rookSquare == move.end_square:
+                        castleFile = kingFile + x * 2
+                        castleSquare = s[castleFile, kingRank]
+                        # Make sure the square is unoccupied.
+                        if not castleSquare.has_piece():
+                            # Make sure path to rook is empty.
+                            for i in range(3, self.file_size):
+                                newFile = kingFile + x * i
+                                # Check if the square is on the board.
+                                if 0 <= newFile < self.file_size:
+                                    pathSquare = s[newFile, kingRank]
+                                    if pathSquare.has_piece():
+                                        piece = pathSquare.get_piece()
+                                        if (pathSquare.has_enemy_piece(king)
+                                            or piece.get_name() != 'Rook'):
+                                            break
+                                        elif (piece.get_name() == 'Rook'
+                                              and not piece.has_moved()):
+                                            moves.append(Move(
+                                                kingSquare, castleSquare,
+                                                self.move_number,
+                                                castle=(piece, 
+                                                piece.get_square(),rookSquare)
+                                                ))
+                                else:
+                                    break
+            
+        
+        
         
     def get_all_moves(self):
         '''Get all moves without considering checks.'''
@@ -238,6 +319,7 @@ class GameState():
         f, r = pawn.get_coords()
         startSquare = s[f, r]
         y = pawn.get_directions()[1]
+        enpassantRank = pawn.get_promotion_rank() - y * 3
         
         # Vertical moves
         if (not pawn.is_pinned() 
@@ -265,6 +347,20 @@ class GameState():
                         and captureSquare.has_enemy_piece(pawn)):
                         moves.append(Move(startSquare, captureSquare,
                                           self.move_number))
+        
+        if self.enpassant and r == enpassantRank:
+            for x, _ in DIRECTIONS['HORIZONTAL']:
+                sideSquare = s[f + x, r]
+                piece = sideSquare.get_piece()
+                if piece != None:
+                    if (piece.get_name() == 'Pawn' 
+                        and piece.get_first_move().end_square == sideSquare):
+                        endSquare = s[f + x, r + y]
+                        moves.append(Move(
+                                startSquare, endSquare, self.move_number,
+                                enpassantSquare=sideSquare
+                                ))
+                    
             
     def get_knight_moves(self, knight, moves):
         '''
@@ -491,13 +587,16 @@ class Move():
     Moves will be stored in the move_log attribute of the GameState().
     '''
     
-    def __init__(self, startSquare, endSquare, moveNumber):
+    def __init__(self, startSquare, endSquare, moveNumber, 
+                 promotion=None, castle=(), enpassantSquare=None):
         self.start_square = startSquare
         self.end_square = endSquare
         self.move_number = moveNumber
         self.piece_moved = self.start_square.get_piece()
         self.piece_captured = self.end_square.get_piece()
         self.promotion_piece = None
+        self.castle = castle # Format (Rook piece, Rook end square)
+        self.enpassant_square = enpassantSquare
         self.move_id = (
             self.move_number,
             
@@ -527,41 +626,61 @@ class Move():
         number, spacer = '', ''
         startSquare = self.start_square.get_name()
         endSquare = self.end_square.get_name()
-        if self.piece_moved.get_color() == 'white':
-            number = str(self.move_number + 1) + '. '
-        
-        if self.piece_moved.get_name() == 'Pawn':
-            startFile, promoSymbol = '', ''
-            if self.piece_captured != None:
-                startFile = startSquare[0]
-                spacer = 'x'
-            if self.contains_promotion():
-                promoSymbol = '=' + self.promotion_piece.get_symbol()
-            
-            return ''.join([
-                    number,
-                    startFile,
-                    spacer,
-                    endSquare,
-                    promoSymbol,
-                ])
-        
+        if self.contains_castle():
+            rookFile = self.castle[1].get_coords()[0]
+            kingFile = self.start_square.get_coords()[0]
+            if rookFile < kingFile:
+                return 'O-O-O'
+            else:
+                return 'O-O'
         else:
-            symbol = self.piece_moved.get_symbol()
-            if self.piece_captured != None:
-                spacer = 'x'
+            if self.piece_moved.get_color() == 'white':
+                number = str(self.move_number + 1) + '. '
             
-            return "{}{}{}{}{}".format(
-                number,
-                symbol, 
-                startSquare,
-                spacer, 
-                endSquare,
-            )
+            if self.piece_moved.get_name() == 'Pawn':
+                startFile, promoSymbol = '', ''
+                if self.piece_captured != None:
+                    startFile = startSquare[0]
+                    spacer = 'x'
+                if self.contains_promotion():
+                    promoSymbol = '=' + self.promotion_piece.get_symbol()
+                
+                return ''.join([
+                        number,
+                        startFile,
+                        spacer,
+                        endSquare,
+                        promoSymbol,
+                    ])
+            
+            else:
+                symbol = self.piece_moved.get_symbol()
+                if self.piece_captured != None:
+                    spacer = 'x'
+                
+                return "{}{}{}{}{}".format(
+                    number,
+                    symbol, 
+                    startSquare,
+                    spacer, 
+                    endSquare,
+                )
         
     def contains_promotion(self):
         '''Returns whether or not a promotion occured during this move.'''
         if self.promotion_piece != None:
+            return True
+        
+        return False
+    
+    def contains_castle(self):
+        if len(self.castle) > 0:
+            return True
+        
+        return False
+    
+    def contains_enpassant(self):
+        if self.enpassant_square != None:
             return True
         
         return False

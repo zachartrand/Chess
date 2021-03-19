@@ -142,7 +142,6 @@ def main():
                                 pieceMoved = validMove.piece_moved
                                 if (pieceMoved.get_name() == 'Pawn'
                                     and pieceMoved.can_promote()):
-                                    print('Promotion time!')
                                     promoteMenu(gs, validMove)
                                 gs.make_new_move(validMove)
                                 
@@ -242,7 +241,8 @@ def drawPieces(screen, gs, theme):
                 color = THEMES[theme][3]
             for move in validMoves:
                 if square == move.start_square:
-                    if move.piece_captured != None:
+                    if (move.piece_captured != None
+                        or move.contains_enpassant()):
                         captureSquares.append(move.end_square)
                     else:
                         moveSquares.append(move.end_square)

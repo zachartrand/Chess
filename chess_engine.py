@@ -97,7 +97,6 @@ class GameState():
         
         # For debugging moves.
         print(move.get_chess_notation(), end=' ')
-        print(self.enpassant)
     
     def undo_move(self):
         '''Method to undo a chess move.'''

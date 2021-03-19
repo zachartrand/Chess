@@ -27,19 +27,24 @@ THEMES = dict(
             p.Color(82, 133, 180),   # dark square
             p.Color(253, 187, 115),  # light square highlight
             p.Color(255, 129, 45),   # dark square highlight
+            p.Color(148, 206, 159),  # light move square
+            p.Color(54, 170, 124),   # dark move square
         ),
         bw = (
             p.Color(255, 255, 255),  # light square
             p.Color(100, 100, 100),  # dark square
-            
             p.Color(140, 236, 146),  # light square highlight
             p.Color(30, 183, 37),    # dark square highlight
+            p.Color(148, 206, 159),  # light move square
+            p.Color(54, 170, 124),   # dark move square
         ),
         yellow = (
             p.Color(247, 241, 142),  # light square
             p.Color(244, 215, 4),    # dark square
             p.Color(253, 187, 115),  # light square highlight
             p.Color(255, 129, 45),   # dark square highlight
+            p.Color(148, 206, 159),  # light move square
+            p.Color(54, 170, 124),   # dark move square
         ),
     )
 
@@ -206,10 +211,14 @@ def drawBoard(screen, gs, theme):
     Draw the squares on the board.
     '''
     squares = gs.board.squares.T.flat
+    moveSquares = []
+    captureSquares = []
     for square in squares:
         file, rank = square.get_coords()
         if gs.upside_down:
             file, rank =file, rank = FLIPPEDBOARD[file], FLIPPEDBOARD[rank]
+        if square.is_selected():
+            moveSquares, captureSquares = markMovementSquares(square, gs)
         if square.get_color() == 'light':
             color = THEMES[theme][0]
         elif square.get_color() == 'dark':
@@ -219,15 +228,48 @@ def drawBoard(screen, gs, theme):
         file * SQ_SIZE, rank * SQ_SIZE,
         SQ_SIZE, SQ_SIZE,
         ))
+        
+     # Draw markers for move squares:
+    if len(moveSquares) > 0:
+        for square in moveSquares:
+            file, rank = square.get_coords()
+            if gs.upside_down:
+                file, rank = FLIPPEDBOARD[file], FLIPPEDBOARD[rank]
+            if square.get_color() == 'light':
+                color = THEMES[theme][4]
+            elif square.get_color() == 'dark':
+                color = THEMES[theme][5]
+            p.draw.rect(screen, color, p.Rect(
+            file * SQ_SIZE, rank * SQ_SIZE,
+            SQ_SIZE, SQ_SIZE,
+            ))
+            
+    if len(captureSquares) > 0:
+        for square in captureSquares:
+            color = (230, 118, 118, 0)
+            file, rank = square.get_coords()
+            if gs.upside_down:
+                file, rank = FLIPPEDBOARD[file], FLIPPEDBOARD[rank]
+            p.draw.rect(screen, color, p.Rect(
+            file * SQ_SIZE, rank * SQ_SIZE,
+            SQ_SIZE, SQ_SIZE,
+            ))
+            # p.draw.circle(
+            #     screen,
+            #     color,
+            #     ((file + 0.5) * SQ_SIZE, (rank + 0.5) * SQ_SIZE),
+            #     SQ_SIZE // 2.1,
+            #     6,
+            # )
+        
+    
 
 
 def drawPieces(screen, gs, theme):
     '''
     Draw the pieces on the board using the current GameState.board.
     '''
-    validMoves = gs.get_valid_moves()
-    moveSquares = []
-    captureSquares = []
+    
     pieces = gs.board.get_pieces()
     for piece in pieces:
         square = piece.get_square()
@@ -239,13 +281,6 @@ def drawPieces(screen, gs, theme):
                 color = THEMES[theme][2]
             elif square.get_color() == 'dark':
                 color = THEMES[theme][3]
-            for move in validMoves:
-                if square == move.start_square:
-                    if (move.piece_captured != None
-                        or move.contains_enpassant()):
-                        captureSquares.append(move.end_square)
-                    else:
-                        moveSquares.append(move.end_square)
             
             p.draw.rect(screen, color, p.Rect(
             file * SQ_SIZE, rank * SQ_SIZE, 
@@ -259,30 +294,20 @@ def drawPieces(screen, gs, theme):
             )
         )
         
-        # Draw markers for move squares:
-    for square in moveSquares:
-        file, rank = square.get_coords()
-        if gs.upside_down:
-            file, rank = FLIPPEDBOARD[file], FLIPPEDBOARD[rank]
-        p.draw.circle(
-            screen,
-            (141, 212, 141, 255),
-            ((file + 0.5) * SQ_SIZE, (rank + 0.5) * SQ_SIZE),
-            SQ_SIZE // 5.5,
-            0,
-        )
-        
-    for square in captureSquares:
-        file, rank = square.get_coords()
-        if gs.upside_down:
-            file, rank = FLIPPEDBOARD[file], FLIPPEDBOARD[rank]
-        p.draw.circle(
-            screen,
-            (230, 118, 118, 0),
-            ((file + 0.5) * SQ_SIZE, (rank + 0.5) * SQ_SIZE),
-            SQ_SIZE // 2.1,
-            6,
-        )
+
+def markMovementSquares(square, gs):
+    validMoves = gs.get_valid_moves()
+    moveSquares = []
+    captureSquares = []
+    for move in validMoves:
+        if square == move.start_square:
+            if (move.piece_captured != None
+                or move.contains_enpassant()):
+                captureSquares.append(move.end_square)
+            else:
+                moveSquares.append(move.end_square)
+                
+    return moveSquares, captureSquares
 
         
 def selectSquare(square, gs):

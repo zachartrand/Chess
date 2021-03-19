@@ -10,6 +10,7 @@ This is the engine that will run the chess game.
 # import numpy as np
 
 from chess_pieces import King, Queen, Rook, Bishop, Knight, Pawn
+from chess_pieces import DIRECTIONS
 from chess_board import Board
 
 
@@ -30,20 +31,10 @@ class GameState():
         self.undo_log = []
         self.move_branches = []
         self.move_number = 0
-        self.move_functions = {
-            'Pawn': (self.get_pawn_moves,),
-            'Knight': (self.get_knight_moves,),
-            'Bishop': (self.get_diagonal_moves,),
-            'Rook': (self.get_file_moves, self.get_rank_moves),
-            'Queen': (
-                self.get_diagonal_moves, 
-                self.get_file_moves, self.get_rank_moves
-            ),
-            'King': (
-                self.get_diagonal_moves, 
-                self.get_file_moves, self.get_rank_moves
-            ),
-        }
+        self.pins = []
+        self.checks = []
+        self.in_check = False
+        self.stalemate_counter = 0
         
     def make_new_move(self, move):
         '''
@@ -56,9 +47,15 @@ class GameState():
             # Clear undo_log after new move if different from previous move.
             self.move_branches.append(self.undo_log)
             self.undo_log.clear()
+        if move.piece_moved.get_name() == 'Pawn':
+            self.stalemate_counter = 0
+        elif move.piece_captured != None:
+            self.stalemate_counter = 0
+        else:
+            self.stalemate_counter += 1
+        
         self.make_move(move)
-        
-        
+    
     def make_move(self, move):
         '''
         Takes a Move as a parameter and executes the move.
@@ -67,15 +64,19 @@ class GameState():
         '''
         if move.piece_captured != None:
             move.end_square.remove_piece()
-        move.end_square.set_piece(move.piece_moved)
         move.start_square.remove_piece()
-        self.move_log.append(move)
+        if move.contains_promotion():
+            move.end_square.set_piece(move.promotion_piece)
+        else:
+            move.end_square.set_piece(move.piece_moved)
+        
+        self.move_log.append((move, self.stalemate_counter))
         if not move.piece_moved.has_moved():
             move.piece_moved.first_move = move
-            
+        
         self.white_to_move = not self.white_to_move
         if self.white_to_move:
-                self.move_number += 1
+            self.move_number += 1
         self.board.update_pieces()
         
         # For debugging moves.
@@ -84,15 +85,20 @@ class GameState():
     def undo_move(self):
         '''Method to undo a chess move.'''
         if len(self.move_log) != 0:
-            move = self.move_log.pop()
+            move, stalemate_counter = self.move_log.pop()
+            if stalemate_counter > 0:
+                self.stalemate_counter = stalemate_counter - 1
             move.end_square.remove_piece()
             move.start_square.set_piece(move.piece_moved)
             if move.piece_captured != None:
                 move.end_square.set_piece(move.piece_captured)
+            if move == move.piece_moved.get_first_move():
+                move.piece_moved.first_move = None
+            
             self.white_to_move = not self.white_to_move
             if not self.white_to_move:
                 self.move_number -= 1
-            self.undo_log.append(move)
+            self.undo_log.append((move, stalemate_counter))
             self.board.update_pieces()
             
             # For debugging.
@@ -101,7 +107,7 @@ class GameState():
     def redo_move(self):
         '''Redo a previously undone move.'''
         if len(self.undo_log) != 0:
-            move = self.undo_log.pop()
+            move, _ = self.undo_log.pop()
             # For debugging.
             print('Redid ', end='')
             self.make_move(move)
@@ -118,23 +124,110 @@ class GameState():
         4. For each of the opponent's moves, see if they attack the King.
         5. If the opponent does attack the King, it's not a valid move.
         '''
-        return self.get_all_moves()
+        moves = []
+        if self.white_to_move:
+            king = self.board.white_king
+        else:
+            king = self.board.black_king
+        self.in_check, self.pins, self.checks = ( 
+            self.get_pins_and_checks(king)
+        )
+        if len(self.pins) != 0:
+            for pin in self.pins:
+                print('Pin on {}'.format(
+                    pin[0].get_piece().get_fullname()
+                    ))
+        if len(self.checks) != 0:
+            for check in self.checks:
+                print('Check from {}'.format(
+                    check[0].get_piece().get_fullname()
+                    ))
+        s = self.board.squares
+        kingFile, kingRank = king.get_coords()
+        if self.in_check:
+            if len(self.checks) == 1:  # Only 1 check, block check or move away.
+                moves = self.get_all_moves()
+                # To block a check you must move a piece into one of the squares
+                # between the enemy piece and the king.
+                check = self.checks[0]
+                # Get coordinates of the piece checking the King
+                checkSquare = check[0]
+                checkDirection = check[1]
+                pieceChecking = checkSquare.get_piece()
+                
+                validSquares = []  # Squares that pieces can move to.
+                if pieceChecking.get_name() == 'Knight':
+                    validSquares = [checkSquare]
+                else:
+                    for x, y in zip(range(self.file_size), 
+                        range(self.rank_size)):
+                        endFile, endRank = (kingFile + checkDirection[0] * x, 
+                            kingRank + checkDirection[1] * y)
+                        if (0 <= endFile < self.file_size 
+                            and 0 <= endRank < self.rank_size):
+                            validSquare = s[(endFile, endRank)]
+                            validSquares.append(validSquare)
+                            if validSquare == checkSquare:
+                                break
+                
+                # When iterating through a list and removing items, iterate
+                # backwards.
+                for move in reversed(moves):
+                    if move.piece_moved.get_name() != 'King':
+                        # Move doesn't move King so it must block or capture.
+                        if not (move.end_square in validSquares):
+                        # i.e. if move doesn't block or capture.
+                            moves.remove(move)
+                
+            else:  # Double check, so has to move.
+                moves = self.move_functions['King'](king)
+                    
+        else:  # Not in check, so all moves (outside of pins) are fine.
+            moves = self.get_all_moves()
+            
+        # Remove all moves that put the King in check.
+        for move in reversed(moves):
+            if move.piece_moved.get_name() == 'King':
+                if self.get_pins_and_checks(king, move.end_square)[0]:
+                    moves.remove(move)
+        
+        return moves
         
     def get_all_moves(self):
         '''Get all moves without considering checks.'''
         moves = []
         for piece in self.board.get_pieces():
             turn = piece.get_color()
+            name = piece.get_name()
             if (
                 (turn == 'white' and self.white_to_move)
                 or (turn == 'black' and not self.white_to_move)
             ):
-                for func in self.move_functions[piece.get_name()]:
-                    func(piece, moves, self.move_number)
+                # Find pins and flag pieces.
+                if name != 'King':
+                    self.is_piece_pinned(piece)
+                # Get moves for each piece.
+                if name == 'Pawn':
+                    self.get_pawn_moves(piece, moves)
+                elif name == 'Knight':
+                    self.get_knight_moves(piece, moves)
+                else:
+                    self.find_moves_on_path(piece, moves)
+                # for func in self.move_functions[name]:
+                #     func(piece, moves)
         
         return moves
     
-    def get_pawn_moves(self, pawn, moves, moveNumber):
+    def is_piece_pinned(self, piece):
+        piece.pin_direction = ()
+        for pin in reversed(self.pins):
+            if pin[0] == piece.get_square():
+                piece.pin_direction = pin[1]
+                self.pins.remove(pin)
+                break
+                
+    
+    def get_pawn_moves(self, pawn, moves):
         '''
         Gets all possible moves for the Pawn.
         
@@ -143,62 +236,37 @@ class GameState():
         '''
         s = self.board.squares
         f, r = pawn.get_coords()
-        if pawn.get_color() == 'black':
-            if r + 1 < self.rank_size:
-                if not s[f, r + 1].has_piece():
-                    moves.append(Move(s[f, r], s[f, r + 1], moveNumber))
-            # Double move on first turn.
-            if r == 1:
-                if not s[f, r + 2].has_piece():
-                    moves.append(Move(s[f, r], s[f, r + 2], moveNumber))
-            # Black Pawn captures.
-            # Look to see if the square down 1 and to the right 1 has a piece 
-            # to capture. 
-            if (
-                f + 1 < self.file_size
-                and r + 1 < self.rank_size
-            ):
+        startSquare = s[f, r]
+        y = pawn.get_directions()[1]
+        
+        # Vertical moves
+        if (not pawn.is_pinned() 
+            or pawn.get_pin_direction() == (0, y)
+            or pawn.get_pin_direction() == (0, -y)):
+            if (r + y < self.rank_size 
+                and not s[f, r + y].has_piece()):
+                moves.append(Move(startSquare, s[f, r + y],
+                        self.move_number))
+                # Double move on first turn.
                 if (
-                    s[f + 1, r + 1].has_piece()
-                    and s[f + 1, r + 1].has_enemy_piece(pawn)
+                    (not pawn.has_moved()) 
+                    and not s[f, r + 2 * y].has_piece()
                 ):
-                    moves.append(Move(s[f, r], s[f + 1, r + 1], moveNumber))
-            if (
-                f - 1 >= 0 
-                and r + 1 < self.rank_size
-            ):
-                if (
-                    self.board.squares[f - 1, r + 1].has_piece()
-                    and s[f - 1, r + 1].has_enemy_piece(pawn)
-                ):
-                    moves.append(Move(s[f, r], s[f - 1, r + 1], moveNumber))
-        if pawn.get_color() == 'white':
-            # White Pawn forward moves.
-            if r - 1 >= 0:
-                if not s[f, r - 1].has_piece():
-                    moves.append(Move(s[f, r], s[f, r - 1], moveNumber))
-            # Double move on first turn.
-            if r == 6:
-                if not s[f, r - 2].has_piece():
-                    moves.append(Move(s[f, r], s[f, r - 2], moveNumber))
-            # White Pawn captures.
-            if (
-                f + 1 < self.file_size
-                and r - 1 >= 0
-            ):
-                if (
-                    s[f + 1, r - 1].has_piece()
-                    and s[f + 1, r - 1].has_enemy_piece(pawn)
-                ):
-                    moves.append(Move(s[f, r], s[f + 1, r - 1], moveNumber))
-            if f - 1 >= 0 and r - 1 >= 0:
-                if (
-                    s[f - 1, r - 1].has_piece()
-                    and s[f - 1, r - 1].has_enemy_piece(pawn)
-                ):
-                    moves.append(Move(s[f, r], s[f - 1, r - 1], moveNumber))
+                    moves.append(Move(startSquare, s[f, r + 2 * y],
+                        self.move_number))
+                    
+        for x, _ in DIRECTIONS['HORIZONTAL']:
+            if (not pawn.is_pinned()
+                or pawn.get_pin_direction() == (x, y)):
+                if ((0 <= f+x < self.file_size) 
+                    and (0 <= r+y < self.rank_size)):
+                    captureSquare = s[f+x, r+y]
+                    if (captureSquare.has_piece() 
+                        and captureSquare.has_enemy_piece(pawn)):
+                        moves.append(Move(startSquare, captureSquare,
+                                          self.move_number))
             
-    def get_knight_moves(self, knight, moves, moveNumber):
+    def get_knight_moves(self, knight, moves):
         '''
         Generate moves for the Knight piece.
         
@@ -207,161 +275,176 @@ class GameState():
         see if a friendly piece is there.  The Knight moves in an L shape: 2 
         squares in one direction, and 1 move to the side.
         '''
-        f, r = knight.get_coords()
-        knightMoves = [
-            (f + 2, r + 1),
-            (f + 2, r - 1),
-            (f - 2, r + 1),
-            (f - 2, r - 1),
-            (f + 1, r + 2),
-            (f - 1, r + 2),
-            (f + 1, r - 2),
-            (f - 1, r - 2)
-        ]
-        s = self.board.squares
-        for file, rank in knightMoves:
-            if (
-                (file < self.file_size 
-                and rank < self.rank_size)
-                and (file >= 0 and rank >= 0)
-            ):
+        if not knight.is_pinned():
+            f, r = knight.get_coords()
+            s = self.board.squares
+            for x, y in knight.get_directions():
+                endFile, endRank = f + x, r + y
                 if (
-                        s[file, rank].has_piece() 
-                        and (s[file, rank].has_enemy_piece(knight))
+                    (0 <= endFile < self.file_size) 
+                    and (0 <= endRank < self.rank_size)
                 ):
-                    moves.append(Move(s[f, r], s[file, rank], moveNumber))
-                elif not s[file, rank].has_piece():
-                    moves.append(Move(s[f, r], s[file, rank], moveNumber))
-                    
-    def find_moves_on_path(self, piece, direction, moves, moveNumber):
+                    if not s[endFile, endRank].has_friendly_piece(knight):
+                        moves.append(
+                            Move(s[f, r], s[endFile, endRank], self.move_number)
+                        )
+    
+    def find_moves_on_path(self, piece, moves):
         '''
         Finds all squares along a horizontal, vertical, or diagonal path and 
         adds them to the move list.
         '''
-        start_square = piece.get_square()
-        for square in direction:
-            path_square = self.board.squares[square]
-            if path_square.has_piece():
-                if path_square.has_friendly_piece(piece):
-                    break
-                elif path_square.has_enemy_piece(piece):
-                    moves.append(Move(start_square, path_square, moveNumber))
-                    break
+        if piece.get_range() != None:
+            if piece.get_range() == 'inf':
+                if self.file_size >= self.rank_size:
+                    pathRange = self.file_size
+                else:
+                    pathRange = self.rank_size
             else:
-                moves.append(Move(start_square, path_square, moveNumber))
-
-
-    def get_diagonal_moves(self, piece, moves, moveNumber):
-        '''
-        Finds the move-available squares in the up-right diagonal for 
-        diagonally moving pieces.
-        
-        Finds valid-move squares above and right for diagonally moving pieces 
-        (Bishops, Queens, and Kings).
-        '''
-        f, r = piece.get_coords()  # Coordinates of the piece.
-        if piece.get_name() == 'King':
-            file_range = rank_range = 2
+                pathRange = 1 + piece.get_range()
+                
+            start_square = piece.get_square()
+            f, r = start_square.get_coords()
+            for direction in piece.get_directions():
+                x, y = direction
+                if (not piece.is_pinned() 
+                    or piece.get_pin_direction() == direction
+                    or piece.get_pin_direction() == (-x, -y)):
+                    for i in range(1, pathRange):
+                        file, rank = f + x * i, r + y * i
+                        if (0 <= file < self.file_size
+                            and 0 <= rank < self.rank_size):
+                            path_square = self.board.squares[file, rank]
+                            if path_square.has_piece():
+                                if path_square.has_friendly_piece(piece):
+                                    break
+                                elif path_square.has_enemy_piece(piece):
+                                    moves.append(Move(start_square, path_square,
+                                        self.move_number))
+                                    break
+                            else:
+                                moves.append(Move(start_square, path_square,
+                                                  self.move_number))
+                            
         else:
-            file_range = self.file_size
-            rank_range = self.rank_size
-        
-        directions = dict(  # Make dictionary of the four diagonal directions.
-            DOWNRIGHT = [
-                (file, rank) 
-                for file, rank in zip(
-                    range(f + 1, f + file_range), 
-                    range(r + 1, r + rank_range)
-                ) 
-                if (file < self.file_size and rank < self.rank_size)
-            ],
-            UPRIGHT = [
-                (file, rank) 
-                for file, rank in zip(
-                    range(f + 1, f + file_range), 
-                    reversed(range(r - rank_range, r))
-                ) 
-                if (file < self.file_size and rank >= 0)
-            ],
-            UPLEFT = [
-                (file, rank) 
-                for file, rank in zip(
-                    reversed(range(f - file_range, f)),
-                    reversed(range(r - rank_range, r))
-                ) 
-                if (file >= 0 and rank >= 0)
-            ],
-            DOWNLEFT = [
-                (file, rank) 
-                for file, rank in zip(
-                    reversed(range(f - file_range, f)),
-                    range(r + 1, r + rank_range)
-                ) 
-                if (file >= 0 and rank < self.rank_size)
-            ],
-        )
-        
-        for d in directions.values():
-            self.find_moves_on_path(piece, d, moves, moveNumber)
+            raise TypeError("This piece doesn't move along a path.")
     
+    def get_pins_and_checks(self, king, king_end_square=None):
+        '''Finds all pinned pieces and checks.'''
+        pins = []
+        checks = []
+        inCheck = False
+        if king_end_square == None:
+            kingFile, kingRank = king.get_square().get_coords()
+        else:
+            kingFile, kingRank = king_end_square.get_coords()
+        # Check outward from king for pins and checks, keep track of pins.
+        directions = dict(  # Make a tuple of all directions away from King.
+            straight = (
+                (-1, 0),  # Left
+                (0, -1),  # Up
+                (1, 0),   # Right
+                (0, 1),   # Down
+            ),
+            diagonal = (
+                (-1, -1), # Up Left
+                (1, -1),  # Up Right
+                (-1, 1),  # Down Left
+                (1, 1),   # Down Right
+            )
+        )   
             
-    def get_file_moves(self, piece, moves, moveNumber):
-        '''
-        Get all movement-available squares above and below the piece.
         
-        Finds valid move squares above row-moving pieces (Rooks, Queens, 
-        and Kings).
-        '''
-        f, r = piece.get_coords()  # Coordinates of the piece.
-        if piece.name == 'King':
-            rank_range = 2
-        else:
-            rank_range = self.rank_size
+        for type_ in directions:
+            for x, y in directions[type_]:
+                possiblePin = ()  # Reset possible pins
+                for i, j in zip(range(1, self.file_size), 
+                    range(1, self.rank_size)):
+                    (endFile, endRank) = (kingFile + x * i, kingRank + y * j)
+                    if ((0 <= endFile < self.file_size)
+                        and (0 <= endRank < self.rank_size)):
+                        square = self.board.squares[endFile, endRank]
+                        if square.has_friendly_piece(king):
+                            # First ally piece could be pinned.
+                            if possiblePin == ():
+                                possiblePin = (square, (x, y))
+                            else:
+                                # No need to check beyond second ally piece, as 
+                                # these will break the pin.
+                                possiblePin = ()
+                                break
+                        elif square.has_enemy_piece(king):
+                            name = square.get_piece().get_name()
+                            color = square.get_piece().get_color()
+                            # Five possibilities in this complex conditional:
+                            # 1. In a cardinal direction away from the king and 
+                            #    the piece is a Rook.
+                            # 2. Diagonally away from the king and the piece is a 
+                            #    Bishop.
+                            # 3. One square away diagonally from the king and the 
+                            #    piece is a Pawn.
+                            # 4. Any direction and the piece is a queen.
+                            # 5. Any direction one square away and the piece is a 
+                            #    King (to prevent kings from attacking 
+                            #    each other).
+                            if ((type_ == 'straight' and name == 'Rook')
+                                or (type_ == 'diagonal' and name == 'Bishop')
+                                or (name == 'Queen')
+                                or (i == 1 and j == 1 and name == 'King')
+                                or (name == 'Pawn' and j == 1 
+                                    and color == 'black'
+                                    and ((x, y) == directions['diagonal'][0] 
+                                         or (x, y) == directions['diagonal'][1]))
+                                or (name == 'Pawn' and j == 1 
+                                    and color == 'white' 
+                                    and ((x, y) == directions['diagonal'][2] 
+                                        or (x, y) == directions['diagonal'][3]))):
+                                if possiblePin == ():  # No piece blocking the 
+                                # King.
+                                    inCheck = True
+                                    checks.append((square, (x, y)))
+                                    break
+                                else:
+                                    pins.append(possiblePin)
+                                    break
+                            else:  # Enemy piece is not applying check.
+                                break
+                    else:
+                        break  # Off the board.
+        # Now check for Knight checks.
+        knightMoves = DIRECTIONS['KNIGHT']
         
-        directions = dict(
-            UP = [
-                (f, rank) 
-                for rank in reversed(range(r - rank_range, r))
-                if rank >= 0
-            ],
-            DOWN = [
-                (f, rank) 
-                for rank in range(r + 1, r + rank_range)
-                if rank < self.rank_size
-            ]
-        )
-        for d in directions.values():
-            self.find_moves_on_path(piece, d, moves, moveNumber)
+        for x, y in knightMoves:
+            endFile, endRank = kingFile + x, kingRank + y
+            if (
+                (0 <= endFile < self.file_size)
+                and (0 <= endRank < self.rank_size)
+            ):
+                square = self.board.squares[endFile, endRank]
+                if (
+                    square.has_enemy_piece(king)
+                    and square.get_piece().get_name() == 'Knight'
+                ):
+                    inCheck == True
+                    checks.append((square, (x, y)))
+        
+        return inCheck, pins, checks
     
-    
-    def get_rank_moves(self, piece, moves, moveNumber):
-        '''
-        Get all movement-available squares to the right of the piece.
-        
-        Finds valid move squares to the left and right of row-moving pieces
-        (Rooks, Queens, and Kings).
-        '''
-        f, r = piece.get_coords()  # Coordinates of the piece.
-        if piece.name == 'King':
-            file_range = 2
+    def promote(self, choice, move):
+        '''Promotes Pawn to Queen, Knight, Rook, or Bishop.'''
+        if move.piece_moved.get_name() == 'Pawn':
+            PROMOTION = dict(
+                q = Queen,
+                k = Knight,
+                r = Rook,
+                b = Bishop,
+            )
+            color = move.piece_moved.get_color()
+            if choice in PROMOTION.keys():
+                promotionPiece = PROMOTION[choice](color)
+                move.promotion_piece = promotionPiece
         else:
-            file_range = self.file_size
-        
-        directions = dict(
-            RIGHT = [
-                (file, r) 
-                for file in range(f + 1, f + file_range)
-                if file < self.file_size
-            ],
-            LEFT = [
-                (file, r) 
-                for file in reversed(range(f - file_range, f))
-                if file >= 0
-            ],
-        )
-        
-        for d in directions.values():
-            self.find_moves_on_path(piece, d, moves, moveNumber)
+            raise ValueError('Only Pawns can be promoted.')
     
 
 def makeStandardBoard():
@@ -391,9 +474,10 @@ def makeStandardBoard():
     board.squares[3, 7].set_piece(Queen('white'))
     board.squares[3, 0].set_piece(Queen('black'))
     # Finally, set the Kings.
-    board.squares[4, 7].set_piece(King('white'))
-    board.squares[4, 0].set_piece(King('black'))
-    
+    board.white_king = King('white')
+    board.squares[4, 7].set_piece(board.white_king)
+    board.black_king = King('black')
+    board.squares[4, 0].set_piece(board.black_king)
     
     board.update_pieces()
     
@@ -413,6 +497,7 @@ class Move():
         self.move_number = moveNumber
         self.piece_moved = self.start_square.get_piece()
         self.piece_captured = self.end_square.get_piece()
+        self.promotion_piece = None
         self.move_id = (
             self.move_number,
             
@@ -439,33 +524,47 @@ class Move():
         # TODO: Check if pieces of the same name are on the same rank as the 
         # piece moved in case more specific notation is needed.
         
-        number = ''
+        number, spacer = '', ''
+        startSquare = self.start_square.get_name()
+        endSquare = self.end_square.get_name()
         if self.piece_moved.get_color() == 'white':
             number = str(self.move_number + 1) + '. '
         
         if self.piece_moved.get_name() == 'Pawn':
+            startFile, promoSymbol = '', ''
             if self.piece_captured != None:
-                return '{}{}{}{}'.format(
-                    number,
-                    self.start_square.get_name()[0],
-                    'x',
-                    self.end_square.get_name(),
-                )
+                startFile = startSquare[0]
+                spacer = 'x'
+            if self.contains_promotion():
+                promoSymbol = '=' + self.promotion_piece.get_symbol()
             
-            return '{}{}'.format(number, self.end_square.get_name())
+            return ''.join([
+                    number,
+                    startFile,
+                    spacer,
+                    endSquare,
+                    promoSymbol,
+                ])
         
         else:
-            spacer = ''
+            symbol = self.piece_moved.get_symbol()
             if self.piece_captured != None:
                 spacer = 'x'
             
             return "{}{}{}{}{}".format(
                 number,
-                self.piece_moved.get_symbol(), 
-                self.start_square.get_name(),
+                symbol, 
+                startSquare,
                 spacer, 
-                self.end_square.get_name(),
+                endSquare,
             )
+        
+    def contains_promotion(self):
+        '''Returns whether or not a promotion occured during this move.'''
+        if self.promotion_piece != None:
+            return True
+        
+        return False
         
 
 

@@ -12,6 +12,33 @@ __all__ = [
     'King', 'Queen', 'Rook', 'Bishop', 'Knight', 'Pawn'
 ]
 
+DIRECTIONS = dict(
+    DIAGONAL = (
+        (1, -1),   # Up Left
+        (-1, -1),  # Up Right
+        (-1, 1),   # Down Left
+        (1, 1),    # Down Right
+    ),
+    HORIZONTAL = (
+        (-1, 0),  # Left
+        (1, 0),   # Right
+    ),
+    VERTICAL = (
+        (0, -1),  # Up
+        (0, 1),   # Down
+    ),
+    KNIGHT = (
+        (-1, -2),  # Up 2, Left 1
+        (1, -2),   # Up 2, Right 1
+        (-1, 2),   # Down 2, Left 1 
+        (1, 2),    # Down 2, Right 1
+        (-2, -1),  # Left 2, Up 1
+        (-2, 1),   # Left 2, Down 1
+        (2, -1),   # Right 2, Up 1
+        (2, 1),    # Right 2, Down 1
+    )
+)
+
 class Piece:
     '''Super class for the different chess pieces.'''
     
@@ -20,8 +47,11 @@ class Piece:
         self.name = ''       # Names will be set in subclasses.
         self.symbol = ''     # Symbols will be set in subclasses.
         self.image_name = '' # Image filename for the piece. Set in subclasses.
-        self.is_attacked = False  # Used to tell if King is in check?
         self.first_move = None  # Store piece's first move.  Used for castling.
+        self.pin_direction = ()  # Direction from which a piece is pinned.
+        self.directions = ()  # Direction the piece can move in.
+        self.range = 'inf'  # Number of squares a piece can move. For limiting 
+            # King moves.
         
         if color.lower().startswith('w'):
             self.color = 'white'
@@ -39,7 +69,8 @@ class Piece:
         return self.square
     
     def get_coords(self):
-        return self.square.get_coords()
+        if self.is_on_board():
+            return self.square.get_coords()
     
     def get_square_name(self):
         '''
@@ -111,6 +142,10 @@ class Piece:
         return self.image_name
     
     def remove(self):
+        '''
+        Removes the piece from a square on the board if the 
+        piece is on the board.
+        '''
         if self.is_on_board():
             self.square = None
     
@@ -123,7 +158,36 @@ class Piece:
             return True
         
         return False
+    
+    def get_first_move(self):
+        '''Returns the first move of the piece if it has one.'''
+        if self.has_moved():
+            return self.first_move
+    
+    def is_pinned(self):
+        '''Returns True if the piece is pinned to the King.'''
+        if len(self.pin_direction) > 0:
+            return True
         
+        return False
+    
+    def get_pin_direction(self):
+        '''Returns the direction a pin is coming from.'''
+        return self.pin_direction
+    
+    def get_directions(self):
+        '''Returns the directions that the piece can move in.'''
+        return self.directions
+        
+    def get_range(self):
+        '''
+        Returns the number of squares along a path the piece can move in.
+        
+        For pieces that can move any number of squares along a path, returns 
+        'inf'.  King returns 1. Pawns have changes to their range based on the
+        first turn, and Knights don't move along paths, so they return None.
+        '''
+        return self.range
 
 class Rook(Piece):
     '''
@@ -138,6 +202,7 @@ class Rook(Piece):
         self.name = 'Rook'
         self.symbol = 'R'
         self.image_name = self.color[0] + self.symbol
+        self.directions = DIRECTIONS['HORIZONTAL'] + DIRECTIONS['VERTICAL']
     
 
 class King(Piece):
@@ -153,6 +218,12 @@ class King(Piece):
         self.name = 'King'
         self.symbol = 'K'
         self.image_name = self.color[0] + self.symbol
+        self.directions = (
+            DIRECTIONS['HORIZONTAL'] 
+            + DIRECTIONS['VERTICAL'] 
+            + DIRECTIONS['DIAGONAL']
+        )
+        self.range = 1
     
 
 class Queen(Piece):
@@ -169,6 +240,11 @@ class Queen(Piece):
         self.name = 'Queen'
         self.symbol = 'Q'
         self.image_name = self.color[0] + self.symbol
+        self.directions = (
+            DIRECTIONS['HORIZONTAL'] 
+            + DIRECTIONS['VERTICAL'] 
+            + DIRECTIONS['DIAGONAL']
+        )
     
 
 class Knight(Piece):
@@ -184,6 +260,8 @@ class Knight(Piece):
         self.name = 'Knight'
         self.symbol = 'N'
         self.image_name = self.color[0] + self.symbol
+        self.directions = DIRECTIONS['KNIGHT']
+        self.range = None
     
 
 class Bishop(Piece):
@@ -198,6 +276,7 @@ class Bishop(Piece):
         self.name = 'Bishop'
         self.symbol = 'B'
         self.image_name = self.color[0] + self.symbol
+        self.directions = DIRECTIONS['DIAGONAL']
     
 
 class Pawn(Piece):
@@ -214,6 +293,26 @@ class Pawn(Piece):
         self.symbol = ''  # Pawn moves are denoted by the square they moved to,
             # no symbol for pawn.
         self.image_name = self.color[0] + 'P'
+        self.range = None
+        
+        if self.color == 'white':
+            self.directions = DIRECTIONS['VERTICAL'][0]
+            self.promotion_rank = 0
+        elif self.color == 'black':
+            self.directions = DIRECTIONS['VERTICAL'][1]
+            self.promotion_rank = 7
+        
+    def get_promotion_rank(self):
+        '''Returns the rank that the Pawn will promote at.'''
+        return self.promotion_rank
+    
+    def can_promote(self):
+        '''Returns whether a pawn can promote.'''
+        rank = self.get_coords()[1]
+        if rank + self.directions[1] == self.get_promotion_rank():
+            return True
+        
+        return False
 
 
 

@@ -150,6 +150,7 @@ class Square:
         
     def remove_piece(self):
         '''Removes the piece from the square.'''
+        self.piece.square = None
         self.piece = None
     
     def get_board(self):
@@ -176,6 +177,9 @@ class Square:
                 return True
             
         return False
+    
+    def is_selected(self):
+        return self.selected
     
 
 class Board:
@@ -206,6 +210,10 @@ class Board:
         self.squares = np.array(
             emptyBoard, dtype=object
             ).reshape((self.files, self.ranks))
+        # Make attributes for each of the kings. Will be set when the board is 
+        # generated. Will be used for checks and pins.
+        self.white_king = None
+        self.black_king = None
     
     def get_size(self):
         '''

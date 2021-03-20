@@ -127,7 +127,7 @@ class GameState():
             self.board.update_pieces()
             
             # For debugging.
-            print('Undid {}.'.format(move.get_chess_notation()), end=' ')  
+            print('Undid {}'.format(move.get_chess_notation()), end=' ')  
         
     def redo_move(self):
         '''Redo a previously undone move.'''
@@ -349,12 +349,17 @@ class GameState():
         
         if self.enpassant and r == enpassantRank:
             for x, _ in DIRECTIONS['HORIZONTAL']:
-                sideSquare = s[f + x, r]
+                sideSquare = s[f+x, r]
                 piece = sideSquare.get_piece()
                 if piece != None:
-                    if (piece.get_name() == 'Pawn' 
-                        and piece.get_first_move().end_square == sideSquare):
-                        endSquare = s[f + x, r + y]
+                    moveNumber = piece.first_move.move_number
+                    if (piece.get_name() == 'Pawn'
+                        and piece.get_first_move().end_square == sideSquare
+                        and ((self.white_to_move 
+                              and self.move_number - 1 == moveNumber) 
+                             or (not self.white_to_move 
+                                 and self.move_number == moveNumber))):
+                        endSquare = s[f+x, r+y]
                         moves.append(Move(
                                 startSquare, endSquare, self.move_number,
                                 enpassantSquare=sideSquare
@@ -374,7 +379,7 @@ class GameState():
             f, r = knight.get_coords()
             s = self.board.squares
             for x, y in knight.get_directions():
-                endFile, endRank = f + x, r + y
+                endFile, endRank = f+x, r+y
                 if (
                     (0 <= endFile < self.file_size) 
                     and (0 <= endRank < self.rank_size)
@@ -406,7 +411,7 @@ class GameState():
                     or piece.get_pin_direction() == direction
                     or piece.get_pin_direction() == (-x, -y)):
                     for i in range(1, pathRange):
-                        file, rank = f + x * i, r + y * i
+                        file, rank = f + x*i, r + y*i
                         if (0 <= file < self.file_size
                             and 0 <= rank < self.rank_size):
                             path_square = self.board.squares[file, rank]
@@ -455,7 +460,7 @@ class GameState():
                 possiblePin = ()  # Reset possible pins
                 for i, j in zip(range(1, self.file_size), 
                     range(1, self.rank_size)):
-                    (endFile, endRank) = (kingFile + x * i, kingRank + y * j)
+                    (endFile, endRank) = (kingFile + x*i, kingRank + y*j)
                     if ((0 <= endFile < self.file_size)
                         and (0 <= endRank < self.rank_size)):
                         square = self.board.squares[endFile, endRank]
@@ -637,8 +642,12 @@ class Move():
                 number = str(self.move_number + 1) + '. '
             
             if self.piece_moved.get_name() == 'Pawn':
-                startFile, promoSymbol = '', ''
-                if self.piece_captured != None:
+                startFile, promoSymbol, ep = '', '', ''
+                if self.contains_enpassant():
+                    startFile = startSquare[0]
+                    ep = 'e.p.'
+                    spacer = 'x'
+                elif self.piece_captured != None:
                     startFile = startSquare[0]
                     spacer = 'x'
                 if self.contains_promotion():
@@ -650,6 +659,7 @@ class Move():
                         spacer,
                         endSquare,
                         promoSymbol,
+                        ep,
                     ])
             
             else:

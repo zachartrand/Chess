@@ -525,7 +525,7 @@ class GameState():
                     square.has_enemy_piece(king)
                     and square.get_piece().get_name() == 'Knight'
                 ):
-                    inCheck == True
+                    inCheck = True
                     checks.append((square, (x, y)))
         
         return inCheck, pins, checks

@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # -*- coding: utf-8 -*-
 """
 Created on Fri Mar 12 23:47:52 2021
@@ -191,22 +193,22 @@ def main():
                 deselectSquare(squares[playerClicks[0]])
             squareSelected = ()
             playerClicks = []
-        drawGameState(screen, gs, theme)
+        drawGameState(screen, gs, theme, validMoves)
         clock.tick(MAX_FPS)
         p.display.flip()
         
 
-def drawGameState(screen, gs, theme):
+def drawGameState(screen, gs, theme, validMoves):
     '''
     Responsible for all the graphics within a current gamestate.
     '''
-    drawBoard(screen, gs, theme)  # Draw squares on the board.
+    drawBoard(screen, gs, theme, validMoves)  # Draw squares on the board.
     # Add in piece highlighting or move suggestions (later)
     drawPieces(screen, gs, theme)  # Draw pieces on the board.
     
 
 
-def drawBoard(screen, gs, theme):
+def drawBoard(screen, gs, theme, validMoves):
     '''
     Draw the squares on the board.
     '''
@@ -218,11 +220,22 @@ def drawBoard(screen, gs, theme):
         if gs.upside_down:
             file, rank =file, rank = FLIPPEDBOARD[file], FLIPPEDBOARD[rank]
         if square.is_selected():
-            moveSquares, captureSquares = markMovementSquares(square, gs)
-        if square.get_color() == 'light':
-            color = THEMES[theme][0]
-        elif square.get_color() == 'dark':
-            color = THEMES[theme][1]
+            moveSquares, captureSquares = markMovementSquares(square, validMoves)
+            if square.get_color() == 'light':
+                color = THEMES[theme][2]
+            elif square.get_color() == 'dark':
+                color = THEMES[theme][3]
+            
+            p.draw.rect(screen, color, p.Rect(
+            file * SQ_SIZE, rank * SQ_SIZE, 
+            SQ_SIZE, SQ_SIZE,
+            ))
+            
+        else:
+            if square.get_color() == 'light':
+                color = THEMES[theme][0]
+            elif square.get_color() == 'dark':
+                color = THEMES[theme][1]
         
         p.draw.rect(screen, color, p.Rect(
         file * SQ_SIZE, rank * SQ_SIZE,
@@ -272,20 +285,9 @@ def drawPieces(screen, gs, theme):
     
     pieces = gs.board.get_pieces()
     for piece in pieces:
-        square = piece.get_square()
-        file, rank = square.get_coords()
+        file, rank = piece.get_coords()
         if gs.upside_down:
-            file, rank =file, rank = FLIPPEDBOARD[file], FLIPPEDBOARD[rank]
-        if square.is_selected():
-            if square.get_color() == 'light':
-                color = THEMES[theme][2]
-            elif square.get_color() == 'dark':
-                color = THEMES[theme][3]
-            
-            p.draw.rect(screen, color, p.Rect(
-            file * SQ_SIZE, rank * SQ_SIZE, 
-            SQ_SIZE, SQ_SIZE,
-            ))
+            file, rank =file, rank = FLIPPEDBOARD[file], FLIPPEDBOARD[rank]            
         pieceName = piece.get_image_name()
         screen.blit(
             IMAGES[pieceName], p.Rect(
@@ -295,8 +297,7 @@ def drawPieces(screen, gs, theme):
         )
         
 
-def markMovementSquares(square, gs):
-    validMoves = gs.get_valid_moves()
+def markMovementSquares(square, validMoves):
     moveSquares = []
     captureSquares = []
     for move in validMoves:

@@ -157,16 +157,16 @@ class GameState():
         self.in_check, self.pins, self.checks = ( 
             self.get_pins_and_checks(king)
         )
-        if len(self.pins) != 0:
-            for pin in self.pins:
-                print('Pin on {}'.format(
-                    pin[0].get_piece().get_fullname()
-                    ))
-        if len(self.checks) != 0:
-            for check in self.checks:
-                print('Check from {}'.format(
-                    check[0].get_piece().get_fullname()
-                    ))
+        # if len(self.pins) != 0:
+            # for pin in self.pins:
+                # print('Pin on {}'.format(
+                #     pin[0].get_piece().get_fullname()
+                #     ))
+        # if len(self.checks) != 0:
+            # for check in self.checks:
+                # print('Check from {}'.format(
+                #     check[0].get_piece().get_fullname()
+                #     ))
         s = self.board.squares
         kingFile, kingRank = king.get_coords()
         if self.in_check:

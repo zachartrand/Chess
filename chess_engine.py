@@ -34,6 +34,8 @@ class GameState():
         self.pins = []
         self.checks = []
         self.in_check = False
+        self.checkmate = False
+        self.stalemate = False
         self.stalemate_counter = 0
         self.enpassant = False
         
@@ -78,7 +80,6 @@ class GameState():
             move.end_square.set_piece(move.piece_moved)
         else:
             move.end_square.set_piece(move.piece_moved)
-        
         
         self.move_log.append((move, self.stalemate_counter))
         if not move.piece_moved.has_moved():
@@ -143,11 +144,11 @@ class GameState():
         '''
         Get all moves considering checks.
         
-        1. Generate all possible moves.
-        2. For each move, make the move.
-        3. Generate all opponent's moves on their upcoming turn.
-        4. For each of the opponent's moves, see if they attack the King.
-        5. If the opponent does attack the King, it's not a valid move.
+        1. Get the King from the side moving this turn.
+        2. Figure out if the King is in check, and if so, by how many pieces.
+        3. Remove all moves that put the King into check.
+        4. If the King hasn't moved, find all castling moves and determine if 
+           they are valid.
         '''
         moves = []
         if self.white_to_move:
@@ -157,16 +158,18 @@ class GameState():
         self.in_check, self.pins, self.checks = ( 
             self.get_pins_and_checks(king)
         )
-        # if len(self.pins) != 0:
-            # for pin in self.pins:
-                # print('Pin on {}'.format(
-                #     pin[0].get_piece().get_fullname()
-                #     ))
-        # if len(self.checks) != 0:
-            # for check in self.checks:
-                # print('Check from {}'.format(
-                #     check[0].get_piece().get_fullname()
-                #     ))
+# =============================================================================
+#         if len(self.pins) != 0:
+#             for pin in self.pins:
+#                 print('Pin on {}'.format(
+#                     pin[0].get_piece().get_fullname()
+#                     ))
+#         if len(self.checks) != 0:
+#             for check in self.checks:
+#                 print('Check from {}'.format(
+#                     check[0].get_piece().get_fullname()
+#                     ))
+# =============================================================================
         s = self.board.squares
         kingFile, kingRank = king.get_coords()
         if self.in_check:
@@ -469,23 +472,23 @@ class GameState():
                             if possiblePin == ():
                                 possiblePin = (square, (x, y))
                             else:
-                                # No need to check beyond second ally piece, as 
-                                # these will break the pin.
+                                # No need to check beyond second ally piece,
+                                # as these will break the pin.
                                 possiblePin = ()
                                 break
                         elif square.has_enemy_piece(king):
                             name = square.get_piece().get_name()
                             color = square.get_piece().get_color()
                             # Five possibilities in this complex conditional:
-                            # 1. In a cardinal direction away from the king and 
-                            #    the piece is a Rook.
-                            # 2. Diagonally away from the king and the piece is a 
-                            #    Bishop.
-                            # 3. One square away diagonally from the king and the 
-                            #    piece is a Pawn.
+                            # 1. In a cardinal direction away from the king 
+                            #    and the piece is a Rook.
+                            # 2. Diagonally away from the king and the piece 
+                            #    is a Bishop.
+                            # 3. One square away diagonally from the king and
+                            #    the piece is a Pawn.
                             # 4. Any direction and the piece is a queen.
-                            # 5. Any direction one square away and the piece is a 
-                            #    King (to prevent kings from attacking 
+                            # 5. Any direction one square away and the piece
+                            #    is a King (to prevent kings from attacking 
                             #    each other).
                             if ((type_ == 'straight' and name == 'Rook')
                                 or (type_ == 'diagonal' and name == 'Bishop')
@@ -511,7 +514,7 @@ class GameState():
                                 break
                     else:
                         break  # Off the board.
-        # Now check for Knight checks.
+        # Now look for Knight checks.
         knightMoves = DIRECTIONS['KNIGHT']
         
         for x, y in knightMoves:
@@ -546,6 +549,15 @@ class GameState():
         else:
             raise ValueError('Only Pawns can be promoted.')
     
+    def findCheckmateOrStalemate(self, validMoves):
+        if len(validMoves) == 0:
+            if self.in_check:
+                self.checkmate = True
+            else:
+                self.stalemate = True
+        elif self.stalemate_counter > 100:
+            self.stalemate = True
+
 
 def makeStandardBoard():
     '''

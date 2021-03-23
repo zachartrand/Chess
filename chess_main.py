@@ -15,62 +15,40 @@ import pygame as p
 import chess_engine
 
 
-WIDTH = HEIGHT = 768                    # Width and height of board in pixels.
+WIDTH = HEIGHT = 720                    # Width and height of board in pixels.
 DIMENSION = 8                           # Chess board is 8 x 8 squares.
 SQ_SIZE = HEIGHT // DIMENSION
-MAX_FPS = 60                            # For animations later on.
+MAX_FPS = 120                            # For animations later on.
 IMAGES = {}                             # Setup for loadImages().
 FLIPPEDBOARD = [i for i in reversed(range(DIMENSION))]  # For getting screen
     # coordinates when the board is drawn from Black's perspective.
 THEMES = dict(
-        # TODO:  Make dictionary of different themes for custom board colors.
-        blue = (
-            p.Color(214, 221, 229),  # light square
-            p.Color(82, 133, 180),   # dark square
-            p.Color(253, 187, 115),  # light square highlight
-            p.Color(255, 129, 45),   # dark square highlight
-            p.Color(148, 206, 159),  # light move square
-            p.Color(54, 170, 124),   # dark move square
-        ),
-        bw = (
-            p.Color(255, 255, 255),  # light square
-            p.Color(100, 100, 100),  # dark square
-            p.Color(140, 236, 146),  # light square highlight
-            p.Color(30, 183, 37),    # dark square highlight
-            p.Color(148, 206, 159),  # light move square
-            p.Color(54, 170, 124),   # dark move square
-        ),
-        yellow = (
-            p.Color(247, 241, 142),  # light square
-            p.Color(244, 215, 4),    # dark square
-            p.Color(253, 187, 115),  # light square highlight
-            p.Color(255, 129, 45),   # dark square highlight
-            p.Color(148, 206, 159),  # light move square
-            p.Color(54, 170, 124),   # dark move square
-        ),
-    )
+    # TODO:  Add more themes for custom board colors.
+    blue = (
+        p.Color(214, 221, 229),  # light square
+        p.Color(82, 133, 180),   # dark square
+        p.Color(253, 187, 115),  # light square highlight
+        p.Color(255, 129, 45),   # dark square highlight
+    ),
+    bw = (
+        p.Color(255, 255, 255),  # light square
+        p.Color(100, 100, 100),  # dark square
+        p.Color(140, 236, 146),  # light square highlight
+        p.Color(30, 183, 37),    # dark square highlight
+    ),
+    yellow = (
+        p.Color(247, 241, 142),  # light square
+        p.Color(244, 215, 4),    # dark square
+        p.Color(253, 187, 115),  # light square highlight
+        p.Color(255, 129, 45),   # dark square highlight
+    ),
+)
 
-def loadImages():
-    '''
-    Initialize a global dictionary of images. 
-    
-    This will be called exactly once in the main().
-    '''
-    colors = ['w', 'b']
-    pieces = ['K', 'Q', 'R', 'B', 'N', 'P']
-    for color in colors:
-        for piece in pieces:
-            pieceName = ''.join([color, piece])
-            IMAGES[pieceName] = p.transform.smoothscale(
-                p.image.load(os.path.join('images', pieceName + '.png')),
-                (SQ_SIZE, SQ_SIZE),
-            )
-    
 
 def main():
     '''
-    The main driver for our code. 
-    
+    The main driver for our code.
+
     This will handle user input and updating the graphics.
     '''
     p.init()
@@ -84,32 +62,20 @@ def main():
     validMoves = gs.get_valid_moves()
     moveMade = False  # Flag variable for when a move is made. Prevents engine
         # from wasting resources every frame to find all valid moves.
-    
     loadImages()  # Only do this once, before the while loop.
-    squareSelected = ()  # No initial square selected, holds last square 
+    squareClicked = ()  # No initial square selected, holds last square
         # clicked by user
-    playerClicks = []  # Keep track of player clicks 
+    playerClicks = []  # Keep track of player clicks
         # (two tuples: [(4, 6), (4, 4)] would be (e2 pawn to) e4)
     gs.upside_down = False
     
     while True:
-        if len(validMoves) == 0:
-            if gs.in_check:
-                print('Checkmate')
-            else:
-                print('Stalemate: No valid moves.')
-            
-            if (input('Would you like to quit the game?').lower() == 'y'):
-                exitGame()
-            else:
-                gs.undo_move()
-                moveMade = True
         # Event handler.  Manages inputs like mouse clicks and button presses.
         for event in p.event.get():
             # Allows the game to be closed.
             if event.type == p.QUIT:
                 exitGame()
-            
+
             # Mouse handlers
             elif event.type == p.MOUSEBUTTONDOWN:
                 location = p.mouse.get_pos()  # (x, y) location of the mouse.
@@ -117,26 +83,26 @@ def main():
                 rank = location[1] // SQ_SIZE
                 if gs.upside_down:
                     file, rank = FLIPPEDBOARD[file], FLIPPEDBOARD[rank]
-                if squareSelected == (file, rank):  # User clicked the same 
+                if squareClicked == (file, rank):  # User clicked the same
                     # square twice.
                     deselectSquare(squares[file, rank])
-                    squareSelected = ()
+                    squareClicked = ()
                     playerClicks = []  # Clear player clicks.
                 else:
-                    squareSelected = (file, rank)
-                    playerClicks.append(squareSelected)  # Append for first 
+                    squareClicked = (file, rank)
+                    playerClicks.append(squareClicked)  # Append for first
                     # and second click.
-                
+
                 # Stops move if first click is a blank square.
                 if len(playerClicks) == 1:
                     if squares[playerClicks[0]].has_piece():
                         selectSquare(squares[playerClicks[0]], gs)
                     else:
-                        squareSelected = ()
+                        squareClicked = ()
                         playerClicks = []
-                
+
                 if len(playerClicks) == 2:  # After second click.
-                    # Only register a move if the first 
+                    # Only register a move if the first
                     # square clicked has a piece.
                     if squares[playerClicks[0]].has_piece():
                         move = chess_engine.Move(
@@ -151,10 +117,12 @@ def main():
                                     and pieceMoved.can_promote()):
                                     promoteMenu(gs, validMove)
                                 gs.make_new_move(validMove)
+                                animateMove(validMove, screen, clock, gs, 
+                                    theme, validMoves)
                                 
                                 moveMade = True
                                 break
-                                
+                        
                         if not moveMade:
                             deselectSquare(squares[playerClicks[0]])
                             if squares[playerClicks[1]].has_piece():
@@ -162,132 +130,162 @@ def main():
                                 playerClicks = [playerClicks[1]]
                             
                             else:
-                                squareSelected = ()
+                                squareClicked = ()
                                 playerClicks = []
             
-            # Key handlers        
+            # Key handlers
             elif event.type == p.KEYDOWN:
                 # Undo move when CTRL+Z is pressed.
                 if ((event.mod & p.KMOD_CTRL and event.key == p.K_z)
                     or event.key == p.K_LEFT
                     or event.key == p.K_a):
-                    gs.undo_move()
-                    moveMade = True
+                    if len(gs.move_log) > 0:
+                        gs.undo_move()
+                        move = gs.undo_log.copy().pop()[0]
+                        animateMove(move, screen, clock, gs, theme, 
+                            validMoves, undo=True)
+                        moveMade = True
                 # Redo move when CTRL+R is pressed.
                 if (
-                       (   
+                       (
                            event.mod & p.KMOD_CTRL and (
                                event.key == p.K_r or event.key == p.K_y
                            )
-                    ) or event.key == p.K_RIGHT 
+                    ) or event.key == p.K_RIGHT
                     or event.key == p.K_d
-                ):  
-                    gs.redo_move()
-                    moveMade = True
-                    
+                ):
+                    if len(gs.undo_log) > 0:
+                        gs.redo_move()
+                        move = gs.move_log.copy().pop()[0]
+                        animateMove(move, screen, clock, gs, theme, validMoves)
+                        moveMade = True
         
         if moveMade:
             validMoves = gs.get_valid_moves()
             moveMade = False
             if len(playerClicks) > 0:
                 deselectSquare(squares[playerClicks[0]])
-            squareSelected = ()
+            squareClicked = ()
             playerClicks = []
         drawGameState(screen, gs, theme, validMoves)
         clock.tick(MAX_FPS)
         p.display.flip()
-        
+
+
+def loadImages():
+    '''
+    Initialize a global dictionary of images.
+
+    This will be called exactly once in the main(), before the while: loop.
+    '''
+    colors = ['w', 'b']
+    pieces = ['K', 'Q', 'R', 'B', 'N', 'P']
+    for color in colors:
+        for piece in pieces:
+            pieceName = ''.join([color, piece])
+            IMAGES[pieceName] = p.transform.smoothscale(
+                p.image.load(os.path.join('images', pieceName + '.png')),
+                (SQ_SIZE, SQ_SIZE),
+            )
+
 
 def drawGameState(screen, gs, theme, validMoves):
     '''
     Responsible for all the graphics within a current gamestate.
     '''
-    drawBoard(screen, gs, theme, validMoves)  # Draw squares on the board.
+    # Draw squares on the board.
+    drawBoard(screen, gs, theme, validMoves)
+    # Highlight selected square and movement/capture squares.
+    if selectedSquare != None:
+        highlightSquares(selectedSquare, screen, gs, theme, validMoves)
     # Add in piece highlighting or move suggestions (later)
     drawPieces(screen, gs, theme)  # Draw pieces on the board.
-    
 
 
 def drawBoard(screen, gs, theme, validMoves):
     '''
     Draw the squares on the board.
     '''
+    global selectedSquare
+    selectedSquare = None
     squares = gs.board.squares.T.flat
-    moveSquares = []
-    captureSquares = []
     for square in squares:
         file, rank = square.get_coords()
         if gs.upside_down:
             file, rank =file, rank = FLIPPEDBOARD[file], FLIPPEDBOARD[rank]
         if square.is_selected():
-            moveSquares, captureSquares = markMovementSquares(square, validMoves)
-            if square.get_color() == 'light':
-                color = THEMES[theme][2]
-            elif square.get_color() == 'dark':
-                color = THEMES[theme][3]
-            
-            p.draw.rect(screen, color, p.Rect(
-            file * SQ_SIZE, rank * SQ_SIZE, 
+            selectedSquare = square
+        if square.get_color() == 'light':
+            color = THEMES[theme][0]
+        elif square.get_color() == 'dark':
+            color = THEMES[theme][1]
+                
+        p.draw.rect(
+            screen, color, p.Rect(
+                file * SQ_SIZE, rank * SQ_SIZE,
+                SQ_SIZE, SQ_SIZE,
+            )
+        )
+
+
+def highlightSquares(selectedSquare, screen, gs, theme, validMoves):
+    file, rank = selectedSquare.get_coords()
+    if gs.upside_down:
+        file, rank = FLIPPEDBOARD[file], FLIPPEDBOARD[rank]
+    if selectedSquare.get_color() == 'light':
+        color = THEMES[theme][2]
+    elif selectedSquare.get_color() == 'dark':
+        color = THEMES[theme][3]
+    
+    p.draw.rect(
+        screen, color, p.Rect(
+            file * SQ_SIZE, rank * SQ_SIZE,
             SQ_SIZE, SQ_SIZE,
-            ))
-            
-        else:
-            if square.get_color() == 'light':
-                color = THEMES[theme][0]
-            elif square.get_color() == 'dark':
-                color = THEMES[theme][1]
-        
-        p.draw.rect(screen, color, p.Rect(
-        file * SQ_SIZE, rank * SQ_SIZE,
-        SQ_SIZE, SQ_SIZE,
-        ))
-        
-     # Draw markers for move squares:
+        )
+    )
+    
+    moveSquares, captureSquares = (
+        markMovementSquares(selectedSquare, validMoves)
+    )
+    # Draw markers for move squares:
     if len(moveSquares) > 0:
         for square in moveSquares:
             file, rank = square.get_coords()
             if gs.upside_down:
                 file, rank = FLIPPEDBOARD[file], FLIPPEDBOARD[rank]
-            if square.get_color() == 'light':
-                color = THEMES[theme][4]
-            elif square.get_color() == 'dark':
-                color = THEMES[theme][5]
-            p.draw.rect(screen, color, p.Rect(
-            file * SQ_SIZE, rank * SQ_SIZE,
-            SQ_SIZE, SQ_SIZE,
-            ))
-            
+            surface = p.Surface((SQ_SIZE, SQ_SIZE))
+            surface.set_alpha(80)
+            surface.fill(p.Color('green'))
+            screen.blit(surface, (file * SQ_SIZE, rank * SQ_SIZE,))
+
+    # Draw markers for capture squares.
     if len(captureSquares) > 0:
         for square in captureSquares:
-            color = (230, 118, 118, 0)
             file, rank = square.get_coords()
             if gs.upside_down:
                 file, rank = FLIPPEDBOARD[file], FLIPPEDBOARD[rank]
-            p.draw.rect(screen, color, p.Rect(
-            file * SQ_SIZE, rank * SQ_SIZE,
-            SQ_SIZE, SQ_SIZE,
-            ))
+            attackSquare = p.Surface((SQ_SIZE, SQ_SIZE))
+            attackSquare.fill((230, 118, 118))
+            attackSquare.set_alpha(255)
+            screen.blit(attackSquare, (file * SQ_SIZE, rank * SQ_SIZE,))
             # p.draw.circle(
-            #     screen,
-            #     color,
-            #     ((file + 0.5) * SQ_SIZE, (rank + 0.5) * SQ_SIZE),
+            #     attackSquare,
+            #     'red',
+            #     (0.5*SQ_SIZE, 0.5*SQ_SIZE),
             #     SQ_SIZE // 2.1,
             #     6,
             # )
-        
-    
 
 
 def drawPieces(screen, gs, theme):
     '''
     Draw the pieces on the board using the current GameState.board.
     '''
-    
     pieces = gs.board.get_pieces()
     for piece in pieces:
         file, rank = piece.get_coords()
         if gs.upside_down:
-            file, rank =file, rank = FLIPPEDBOARD[file], FLIPPEDBOARD[rank]            
+            file, rank =file, rank = FLIPPEDBOARD[file], FLIPPEDBOARD[rank]
         pieceName = piece.get_image_name()
         screen.blit(
             IMAGES[pieceName], p.Rect(
@@ -295,9 +293,16 @@ def drawPieces(screen, gs, theme):
                 SQ_SIZE, SQ_SIZE,
             )
         )
-        
+
 
 def markMovementSquares(square, validMoves):
+    '''
+    Finds the squares that the selected piece can move to and stores them as
+    two lists.  
+    
+    These lists are used in the drawBoard function to highlight move and 
+    capture squares of the selected piece.
+    '''
     moveSquares = []
     captureSquares = []
     for move in validMoves:
@@ -307,13 +312,83 @@ def markMovementSquares(square, validMoves):
                 captureSquares.append(move.end_square)
             else:
                 moveSquares.append(move.end_square)
-                
+
     return moveSquares, captureSquares
 
+
+def animateMove(move, screen, clock, gs, theme, validMoves, undo=False):
+    '''Animates pieces when they are moved.'''
+    # Get move info.
+    pieceMoved = move.piece_moved
+    pieceCaptured = move.piece_captured
+    startSquare, endSquare = move.start_square, move.end_square
+    if undo:
+        startSquare, endSquare = endSquare, startSquare
+        pieceCaptured = None
+    startFile, startRank = startSquare.get_coords()
+    endFile, endRank = endSquare.get_coords()
+    endSquareColor = endSquare.get_color()
+    dFile = endFile - startFile  # Change in file for the piece moved.
+    dRank = endRank - startRank  # Change in rank for the piece moved.
+    if move.contains_castle():
+        rook, rookStartSquare, rookEndSquare = move.castle
+        if undo:
+            rookStartSquare, rookEndSquare = rookEndSquare, rookStartSquare
+        rookStartFile, rookStartRank = rookStartSquare.get_coords()
+        rookEndFile, rookEndRank = rookEndSquare.get_coords()
+        dRookFile = rookEndFile - rookStartFile
+        dRookRank = rookEndRank - rookStartRank
+        rookEndSquareColor = rookEndSquare.get_color()
+    framesPerMove = MAX_FPS // 10 + 1  # Number of frames to one move.
+    # moveDistance = abs(dRank) + abs(dFile)
+    for frame in range(1, framesPerMove):
+        drawBoard(screen, gs, theme, validMoves)
+        drawPieces(screen, gs, theme)
+        # Erase the piece being moved from its ending square.
+        if endSquareColor == 'light':
+            color = THEMES[theme][0]
+        elif endSquareColor == 'dark':
+            color = THEMES[theme][1]
+        p.draw.rect(screen, color,
+            p.Rect(endFile*SQ_SIZE, endRank*SQ_SIZE, SQ_SIZE, SQ_SIZE))
+        if move.contains_castle():
+            if rookEndSquareColor == 'light':
+                color = THEMES[theme][0]
+            elif rookEndSquareColor == 'dark':
+                color = THEMES[theme][1]
+            p.draw.rect(screen, color,
+                p.Rect(rookEndFile*SQ_SIZE, rookEndRank*SQ_SIZE,
+                    SQ_SIZE, SQ_SIZE))
+            drawAnimationFrame(rook, None, rookStartFile, rookStartRank, 
+                dRookFile, dRookRank, rookEndFile, rookEndRank, frame,
+                framesPerMove, screen)
+        drawAnimationFrame(pieceMoved, pieceCaptured, startFile, startRank, 
+            dFile, dRank, endFile, endRank, frame, framesPerMove, screen)
         
+        p.display.flip()
+        clock.tick(MAX_FPS)
+
+
+def drawAnimationFrame(pieceMoved, pieceCaptured, startFile, startRank, dFile,
+    dRank, endFile, endRank, frame, framesPerMove, screen):
+    '''
+    Draws a single frame of animation.
+    '''
+    file, rank = (startFile + dFile*frame/framesPerMove, 
+                  startRank + dRank*frame/framesPerMove)
+    # Draw captured piece onto end Square.
+    if pieceCaptured != None:
+        screen.blit(IMAGES[pieceCaptured.get_image_name()], 
+            p.Rect(endFile*SQ_SIZE, endRank*SQ_SIZE, SQ_SIZE, SQ_SIZE))
+    # Draw moving piece.
+    screen.blit(IMAGES[pieceMoved.get_image_name()], 
+        p.Rect(file*SQ_SIZE, rank*SQ_SIZE, SQ_SIZE, SQ_SIZE))
+        
+
+
 def selectSquare(square, gs):
     '''
-    Adds a flag to highlight the square that is clicked on if the piece 
+    Adds a flag to highlight the square that is clicked on if the piece
     color is the same as the turn.
     '''
     if not square.is_selected():
@@ -324,9 +399,10 @@ def selectSquare(square, gs):
 
 
 def deselectSquare(square):
+    '''Deselects a selected square.'''
     if square.is_selected():
         square.selected = False
-    
+
 
 def promoteMenu(gs, move):
     choices = 'qkrb'
@@ -336,72 +412,19 @@ def promoteMenu(gs, move):
         gs.promote(i[0], move)
     else:
         print('Incorrect choice.')
-        promoteMenu(move.piece_moved)
-    
-    
+        promoteMenu(gs, move)
+
+
 def exitGame():
     p.quit()
     sys.exit()
-    
-    
 
-# =============================================================================
-# Older functions for drawing the squares on the board.
-# 
-# def drawBoard2(screen, board, theme):
-#     '''
-#     Draw the squares on the board.
-#     '''
-#     for rank in range(DIMENSION):
-#         for file in range(DIMENSION):
-#             if (board.squares[file, rank].get_color() == 'light'):
-#                 if board.squares[file, rank].is_selected():
-#                     color = THEMES[theme][2]
-#                 else:
-#                     color = THEMES[theme][0]
-#             else:
-#                 if board.squares[file, rank].is_selected():
-#                     color = THEMES[theme][3]
-#                 else:
-#                     color = THEMES[theme][1]
-#             p.draw.rect(screen, color, p.Rect(
-#                 file * SQ_SIZE, rank * SQ_SIZE, SQ_SIZE, SQ_SIZE,
-#                 ))
-#             
-# def drawBoard3(screen, board, theme):
-#     '''
-#     Draw the squares on the board.
-#     '''
-#     squares = board.squares.T.flat
-#     for square in squares:
-#         file, rank = square.get_coords()
-#         if square.get_color() == 'light':
-#                 if board.squares[file, rank].is_selected():
-#                     color = THEMES[theme][2]
-#                 else:
-#                     color = THEMES[theme][0]
-#         else:
-#             if square.is_selected():
-#                 color = THEMES[theme][3]
-#             else:
-#                 color = THEMES[theme][1]
-#         p.draw.rect(screen, color, p.Rect(
-#             file * SQ_SIZE, rank * SQ_SIZE,
-#             SQ_SIZE, SQ_SIZE,
-#             ))
-# =============================================================================
-
-    
 
 
 
 
 if __name__ == '__main__':
     main()
-
-
-
-
 
 
 

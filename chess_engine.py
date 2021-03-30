@@ -34,6 +34,7 @@ class GameState():
         self.pins = []
         self.checks = []
         self.in_check = False
+        self.gameover = False
         self.checkmate = False
         self.stalemate = False
         self.stalemate_counter = 0
@@ -66,7 +67,6 @@ class GameState():
         Does not work for castling, en passant, or pawn promotion.
         '''
         if move.contains_enpassant():
-            move.piece_captured = move.enpassant_square.get_piece()
             move.enpassant_square.remove_piece()
         elif move.piece_captured != None:
             move.end_square.remove_piece()
@@ -97,7 +97,7 @@ class GameState():
         self.board.update_pieces()
         
         # For debugging moves.
-        print(move.get_chess_notation(), end=' ')
+        # print(move.get_chess_notation(), end=' ')
     
     def undo_move(self):
         '''Method to undo a chess move.'''
@@ -121,6 +121,10 @@ class GameState():
                 rookEndSquare.remove_piece()
                 rookStartSquare.set_piece(rook)
             
+            if self.checkmate:
+                self.checkmate = False
+            if self.stalemate:
+                self.stalemate = False
             self.white_to_move = not self.white_to_move
             if not self.white_to_move:
                 self.move_number -= 1
@@ -128,18 +132,14 @@ class GameState():
             self.board.update_pieces()
             
             # For debugging.
-            print('Undid {}'.format(move.get_chess_notation()), end=' ')  
+            # print('Undid {}'.format(move.get_chess_notation()), end=' ')  
         
     def redo_move(self):
         '''Redo a previously undone move.'''
         if len(self.undo_log) != 0:
             move, _ = self.undo_log.pop()
-            # For debugging.
-            print('Redid ', end='')
             self.make_move(move)
             
-            
-        
     def get_valid_moves(self):
         '''
         Get all moves considering checks.
@@ -155,6 +155,8 @@ class GameState():
             king = self.board.white_king
         else:
             king = self.board.black_king
+        if king.get_square() == None:
+            return []
         self.in_check, self.pins, self.checks = ( 
             self.get_pins_and_checks(king)
         )
@@ -208,18 +210,19 @@ class GameState():
                             moves.remove(move)
                 
             else:  # Double check, so has to move.
-                moves = self.move_functions['King'](king)
+                self.get_king_and_knight_moves(king, moves)
                     
         else:  # Not in check, so all moves (outside of pins) are fine.
             moves = self.get_all_moves()
             
         # Remove all moves that put the King in check.
-        for move in reversed(moves):
-            if move.piece_moved.get_name() == 'King':
-                # If the move puts the King in check, remove that move from the
-                # valid moves list.
-                if self.get_pins_and_checks(king, move.end_square)[0]:
-                    moves.remove(move)
+        if len(moves) > 0:
+            for move in reversed(moves):
+                if move.piece_moved.get_name() == 'King':
+                    # If the move puts the King in check, remove that move 
+                    # from the valid moves list.
+                    if self.get_pins_and_checks(king, move.end_square)[0]:
+                        moves.remove(move)
         
         if not king.has_moved() and not self.in_check:
             self.get_castle_moves(king, moves)
@@ -272,10 +275,7 @@ class GameState():
                                                 ))
                                 else:
                                     break
-            
-        
-        
-        
+    
     def get_all_moves(self):
         '''Get all moves without considering checks.'''
         moves = []
@@ -292,23 +292,21 @@ class GameState():
                 # Get moves for each piece.
                 if name == 'Pawn':
                     self.get_pawn_moves(piece, moves)
-                elif name == 'Knight':
-                    self.get_knight_moves(piece, moves)
+                elif name == 'King' or name == 'Knight':
+                    self.get_king_and_knight_moves(piece, moves)
                 else:
                     self.find_moves_on_path(piece, moves)
-                # for func in self.move_functions[name]:
-                #     func(piece, moves)
         
         return moves
     
     def is_piece_pinned(self, piece):
+        '''Checks if the piece is pinned to the King in any directions.'''
         piece.pin_direction = ()
         for pin in reversed(self.pins):
             if pin[0] == piece.get_square():
                 piece.pin_direction = pin[1]
                 self.pins.remove(pin)
                 break
-                
     
     def get_pawn_moves(self, pawn, moves):
         '''
@@ -352,44 +350,52 @@ class GameState():
         
         if self.enpassant and r == enpassantRank:
             for x, _ in DIRECTIONS['HORIZONTAL']:
-                sideSquare = s[f+x, r]
-                piece = sideSquare.get_piece()
-                if piece != None:
-                    moveNumber = piece.first_move.move_number
-                    if (piece.get_name() == 'Pawn'
-                        and piece.get_first_move().end_square == sideSquare
-                        and ((self.white_to_move 
-                              and self.move_number - 1 == moveNumber) 
-                             or (not self.white_to_move 
-                                 and self.move_number == moveNumber))):
-                        endSquare = s[f+x, r+y]
-                        moves.append(Move(
-                                startSquare, endSquare, self.move_number,
-                                enpassantSquare=sideSquare
-                                ))
-                    
-            
-    def get_knight_moves(self, knight, moves):
+                if f + x < self.file_size:
+                    sideSquare = s[f+x, r]
+                    piece = sideSquare.get_piece()
+                    if piece != None:
+                        moveNumber = piece.first_move.move_number
+                        if (
+                            piece.get_name() == 'Pawn'
+                            and piece.get_first_move().end_square == sideSquare
+                            and ((self.white_to_move 
+                                 and self.move_number - 1 == moveNumber) 
+                                 or (not self.white_to_move 
+                                     and self.move_number == moveNumber))
+                        ):
+                            endSquare = s[f+x, r+y]
+                            move = Move(
+                                    startSquare, endSquare, self.move_number,
+                                    enpassantSquare=sideSquare
+                            )
+                            move.piece_captured = piece
+                            moves.append(move)
+    
+    def get_king_and_knight_moves(self, piece, moves):
         '''
-        Generate moves for the Knight piece.
+        Generate moves for the King and Knight pieces.
         
-        The Knight is the only piece that can jump, so the only thing this needs 
-        to do is check the, at most, eight (8) squares that it could move to and 
-        see if a friendly piece is there.  The Knight moves in an L shape: 2 
-        squares in one direction, and 1 move to the side.
+        The King moves only one space in any direction, so there's no need to
+        check for squares on a path.
+        
+        The Knight is the only piece that can jump, so the only thing this
+        needs to do is check the, at most, eight (8) squares that it could
+        move to and see if a friendly piece is there.  The Knight moves in an
+        L shape: 2 squares in one direction, and 1 move to the side.
         '''
-        if not knight.is_pinned():
-            f, r = knight.get_coords()
+        if not piece.is_pinned():
+            f, r = piece.get_coords()
             s = self.board.squares
-            for x, y in knight.get_directions():
+            for x, y in piece.get_directions():
                 endFile, endRank = f+x, r+y
                 if (
                     (0 <= endFile < self.file_size) 
                     and (0 <= endRank < self.rank_size)
                 ):
-                    if not s[endFile, endRank].has_friendly_piece(knight):
+                    if not s[endFile, endRank].has_friendly_piece(piece):
                         moves.append(
-                            Move(s[f, r], s[endFile, endRank], self.move_number)
+                            Move(s[f, r], s[endFile, endRank],
+                                 self.move_number)
                         )
     
     def find_moves_on_path(self, piece, moves):
@@ -397,40 +403,36 @@ class GameState():
         Finds all squares along a horizontal, vertical, or diagonal path and 
         adds them to the move list.
         '''
-        if piece.get_range() != None:
-            if piece.get_range() == 'inf':
-                if self.file_size >= self.rank_size:
-                    pathRange = self.file_size
-                else:
-                    pathRange = self.rank_size
-            else:
-                pathRange = 1 + piece.get_range()
-                
-            start_square = piece.get_square()
-            f, r = start_square.get_coords()
-            for direction in piece.get_directions():
-                x, y = direction
-                if (not piece.is_pinned() 
-                    or piece.get_pin_direction() == direction
-                    or piece.get_pin_direction() == (-x, -y)):
-                    for i in range(1, pathRange):
-                        file, rank = f + x*i, r + y*i
-                        if (0 <= file < self.file_size
-                            and 0 <= rank < self.rank_size):
-                            path_square = self.board.squares[file, rank]
-                            if path_square.has_piece():
-                                if path_square.has_friendly_piece(piece):
-                                    break
-                                elif path_square.has_enemy_piece(piece):
-                                    moves.append(Move(start_square, path_square,
-                                        self.move_number))
-                                    break
-                            else:
-                                moves.append(Move(start_square, path_square,
-                                                  self.move_number))
-                            
+        start_square = piece.get_square()
+        f, r = start_square.get_coords()
+        if self.file_size >= self.rank_size:
+            pathRange = self.file_size
         else:
-            raise TypeError("This piece doesn't move along a path.")
+            pathRange = self.rank_size
+        for direction in piece.get_directions():
+            x, y = direction
+            if (not piece.is_pinned() 
+                or piece.get_pin_direction() == direction
+                or piece.get_pin_direction() == (-x, -y)):
+                for i in range(1, pathRange):
+                    file, rank = f + x*i, r + y*i
+                    if (0 <= file < self.file_size
+                        and 0 <= rank < self.rank_size):
+                        path_square = self.board.squares[file, rank]
+                        if path_square.has_piece():
+                            if path_square.has_friendly_piece(piece):
+                                break
+                            elif path_square.has_enemy_piece(piece):
+                                moves.append(Move(
+                                    start_square, path_square,
+                                    self.move_number
+                                    ))
+                                break
+                        else:
+                            moves.append(
+                                Move(start_square, path_square, 
+                                     self.move_number)
+                            )
     
     def get_pins_and_checks(self, king, king_end_square=None):
         '''Finds all pinned pieces and checks.'''
@@ -444,16 +446,11 @@ class GameState():
         # Check outward from king for pins and checks, keep track of pins.
         directions = dict(  # Make a tuple of all directions away from King.
             straight = (
-                (-1, 0),  # Left
-                (0, -1),  # Up
-                (1, 0),   # Right
-                (0, 1),   # Down
+                DIRECTIONS['HORIZONTAL']
+                + DIRECTIONS['VERTICAL']
             ),
             diagonal = (
-                (-1, -1), # Up Left
-                (1, -1),  # Up Right
-                (-1, 1),  # Down Left
-                (1, 1),   # Down Right
+                DIRECTIONS['DIAGONAL']
             )
         )   
             
@@ -501,7 +498,7 @@ class GameState():
                                 or (name == 'Pawn' and j == 1 
                                     and color == 'white' 
                                     and ((x, y) == directions['diagonal'][2] 
-                                        or (x, y) == directions['diagonal'][3]))):
+                                         or (x, y) == directions['diagonal'][3]))):
                                 if possiblePin == ():  # No piece blocking the 
                                 # King.
                                     inCheck = True
@@ -550,6 +547,10 @@ class GameState():
             raise ValueError('Only Pawns can be promoted.')
     
     def findCheckmateOrStalemate(self, validMoves):
+        '''
+        Determines if the game is over 
+        and whether it is checkmate or stalemate.
+        '''
         if len(validMoves) == 0:
             if self.in_check:
                 self.checkmate = True
@@ -557,6 +558,9 @@ class GameState():
                 self.stalemate = True
         elif self.stalemate_counter > 100:
             self.stalemate = True
+        
+        self.gameover = True if self.checkmate or self.stalemate else False
+            
 
 
 def makeStandardBoard():
@@ -609,10 +613,10 @@ class Move():
         self.end_square = endSquare
         self.move_number = moveNumber
         self.piece_moved = self.start_square.get_piece()
+        self.enpassant_square = enpassantSquare
         self.piece_captured = self.end_square.get_piece()
         self.promotion_piece = None
         self.castle = castle # Format (Rook piece, Rook end square)
-        self.enpassant_square = enpassantSquare
         self.move_id = (
             self.move_number,
             
@@ -625,7 +629,7 @@ class Move():
             
             self.piece_captured
         )
-        
+    
     def __eq__(self, other):
         if isinstance(other, Move):
             return self.move_id == other.move_id

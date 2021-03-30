@@ -73,7 +73,7 @@ def main():
     playerClicks = []  # Keep track of player clicks
         # (two tuples: [(4, 6), (4, 4)] would be (e2 pawn to) e4)
     gs.upside_down = False
-    humanWhite = False  # True if human player is white.
+    humanWhite = True  # True if human player is white.
     humanBlack = True  # True if human player is black.
     if humanBlack and not humanWhite:
         gs.upside_down = True
@@ -415,9 +415,9 @@ def animateMove(move, validMoves, undo=False):
             (rookStartFile, rookStartRank) = (
                 FLIPPEDBOARD[rookStartFile], FLIPPEDBOARD[rookStartRank]
             )
-        (rookEndFile, rookEndRank) = (
-            FLIPPEDBOARD[rookEndFile], FLIPPEDBOARD[rookEndRank]
-        )
+            (rookEndFile, rookEndRank) = (
+                FLIPPEDBOARD[rookEndFile], FLIPPEDBOARD[rookEndRank]
+            )
         dRookFile = rookEndFile - rookStartFile
         dRookRank = rookEndRank - rookStartRank
         rookEndSquareColor = rookEndSquare.get_color()

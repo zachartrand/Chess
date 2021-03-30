@@ -10,7 +10,7 @@ import random as rn
 
 
 __all__ = [
-    'getRandomMove', 'getBestMinMaxMove',
+    'getRandomMove', 'getBestMove'
 ]
 
 PIECE_SCORE = dict(

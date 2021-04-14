@@ -3,9 +3,9 @@
 ### How to run.
 
 This game uses Python 3.8 and Pygame 2.0. When testing, the main was called 
-in iPython, so that might be the best console to use when running this game.
-To run, open the chess_main.py file using Python or iPython in a command
-prompt window. If your Python distribution is through conda, make sure you 
+in IPython, so that might be the best console to use when running this game.
+To run, open the chess_main.py file using Python or IPython in a command
+prompt window. If your Python distribution is through conda, be sure to
 have your conda environment activated before trying to load the main file.
 
 ### About
@@ -22,4 +22,4 @@ Sharick, found here:
     
 and then modified to work with the objects that I created.  Unlike Eddie's program, 
 this one uses objects as the pieces and board elements whereas his pieces and board 
-are just text and a list of lists.
+are text and a list of lists, respectively.

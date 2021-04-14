@@ -23,5 +23,5 @@ Sharick, found here:
 and then modified to work with the objects that I created.  Unlike Eddie's program, 
 this one uses objects as the pieces and board elements whereas his pieces and board 
 are text and a list of lists, respectively. I have also cleaned up some of the 
-algorithms used to find squares for the pieces to move and added square highlighting
+algorithms used to find squares for the pieces to move to and added square highlighting
 when pieces are selected.

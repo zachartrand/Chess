@@ -2,7 +2,7 @@
 
 ### How to run.
 
-This game uses Python 3.8 and Pygame 2.0. When testing, the main was called 
+This game uses Python 3.8, Pygame 2.0, and NumPy 1.20. When testing, the main was called 
 in IPython, so that might be the best console to use when running this game.
 To run, open the chess_main.py file using Python or IPython in a command
 prompt window. If your Python distribution is through conda, be sure to

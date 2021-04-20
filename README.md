@@ -20,7 +20,7 @@ this exercise.
 The chess_engine and chess_main were made following the YouTube tutorial by Eddie 
 Sharick, found here:  
     
-    https://youtu.be/EnYui0e73Rs&list=PLBwF487qi8MGU81nDGaeNE1EnNEPYWKY_
+* https://youtu.be/EnYui0e73Rs&list=PLBwF487qi8MGU81nDGaeNE1EnNEPYWKY_
     
 and then modified to work with the objects that I created.  Unlike Eddie's program, 
 this one uses objects as the pieces and board elements whereas his pieces and board 

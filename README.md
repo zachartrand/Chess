@@ -1,6 +1,6 @@
 ## Object-oriented chess engine.
 
-<img src='images/screenshot.png' width=60%>
+<img src='images/screenshot.png' width=90%>
 
 ### How to run.
 

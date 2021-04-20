@@ -1,5 +1,7 @@
 ## Object-oriented chess engine.
 
+<img src='images/screenshot.png' width=60%>
+
 ### How to run.
 
 This game uses Python 3.8, Pygame 2.0, and NumPy 1.20. When testing, the main was called 

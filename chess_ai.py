@@ -7,7 +7,7 @@ Created on Wed Mar 24 11:26:24 2021
 
 import random as rn
 # from numba import njit
-from joblib import Parallel
+# from joblib import Parallel
 
 
 __all__ = [
@@ -24,7 +24,7 @@ PIECE_SCORE = dict(
 )
 CHECKMATE = PIECE_SCORE['King'] + 1
 STALEMATE = 0
-MAX_DEPTH = 3
+MAX_DEPTH = 2
 
 
 def getRandomMove(validMoves):
@@ -217,11 +217,6 @@ def scoreMaterial(board):
                 score -= PIECE_SCORE[piece.get_name()]
     
     return score
-
-
-
-
-
 
 
 

@@ -14,6 +14,8 @@ __all__ = [
 
 import numpy as np  # We'll use a numpy array for the board.
 
+from chess_pieces import King, Queen, Rook, Bishop, Knight, Pawn
+
 FILE = 'abcdefgh'  # Letters are used to denote files.
 RANK = '87654321'  # Numbers are used to denote ranks.
 
@@ -135,7 +137,7 @@ class Square:
     
     def get_piece_name(self):
         '''Returns a string stating which piece is on the square.'''
-        if self.piece:
+        if self.has_piece():
             return self.piece.get_name()
         else:
             return 'There is no piece on {}.'.format(self.get_name())
@@ -150,10 +152,12 @@ class Square:
         
     def remove_piece(self):
         '''Removes the piece from the square.'''
-        self.piece.square = None
-        self.piece = None
-    
+        if self.has_piece():
+            self.piece.square = None
+            self.piece = None
+        
     def get_board(self):
+        '''Returns the Board object that the square belongs to.'''
         return self.board
     
     def has_friendly_piece(self, piece):
@@ -169,8 +173,8 @@ class Square:
     
     def has_enemy_piece(self, piece):
         '''
-        Determines if the piece on the given square is the opposite color of the 
-        given piece.
+        Determines if the piece on the given square is the opposite color of
+        the given piece.
         '''
         if self.has_piece():
             if piece.get_color() != self.get_piece().get_color():
@@ -179,6 +183,10 @@ class Square:
         return False
     
     def is_selected(self):
+        '''
+        Returns True if the square is currently selected by the player.
+        Otherwise, returns False.
+        '''
         return self.selected
     
 
@@ -198,8 +206,19 @@ class Board:
         
         self.files = numFiles
         self.ranks = numRanks
-        self.pieces = np.array([], dtype=object)  # For iterating through 
-            # pieces on the board.  Will be populated when pieces are added.
+        self.pieces = []  # For iterating through pieces on the board.
+            # Will be populated when pieces are added.
+        self.queens, self.rooks, self.knights, self.bishops = (
+            {'white': [], 'black': []}, {'white': [], 'black': []},
+            {'white': [], 'black': []}, {'white': [], 'black': []},
+        )  # For iterating to find if multiple pieces of the same type and 
+           # color are on the same file or rank.
+        self.piece_lists = dict(
+            Queen = self.queens,
+            Rook = self.rooks,
+            Knight = self.knights,
+            Bishop = self.bishops,
+        )
         
         emptyBoard = []
         # for _ in range(numFiles):
@@ -221,34 +240,147 @@ class Board:
         
         Returns a tuple of the form
         
-            (files, ranks).
+            files, ranks.
         '''
         return self.files, self.ranks
     
-    def update_pieces(self):
+    def update_pieces(self, /, pieces_set=[], pieces_removed=[]):
         '''
         Updates the Board's pieces attribute by removing captured pieces 
         and adding new ones (e.g., from Pawn promotion).
         '''
-        pieces = []
-        squares = self.squares.T.flat
-        for square in squares:
-            if square.has_piece():
-                pieces.append(square.get_piece())
+        if not self.pieces:
+            # If the board hasn't had its pieces attribute set, iterate through
+            # all of the squares and add the pieces to their relevant lists.
+            for square in self.squares.flat:
+                if square.has_piece():
+                    piece = square.get_piece()
+                    name = piece.get_name()
+                    color = piece.get_color()
+                    self.pieces.append(piece)
+                    if name in self.piece_lists.keys():
+                        self.piece_lists[name][color].append(piece)
         
-        self.pieces = np.array(pieces, dtype=object)
-                
-        
+        else:
+            # If pieces are removed or added to the board, 
+            # remove/add them to their relevant lists.
+            if pieces_set:
+                for piece in reversed(pieces_set):
+                    name = piece.get_name()
+                    color = piece.get_color()
+                    self.pieces.append(piece)
+                    if name in self.piece_lists.keys():
+                        self.piece_lists[name][color].append(piece)
+            if pieces_removed:
+                for piece in reversed(pieces_removed):
+                    name = piece.get_name()
+                    color = piece.get_color()
+                    self.pieces.remove(piece)
+                    if name in self.piece_lists.keys():
+                        self.piece_lists[name][color].remove(piece)
+    
     def get_pieces(self):
-        '''Returns an array of pieces currently on the board.'''
+        '''Returns a list of pieces currently on the board.'''
         return self.pieces
 
 
+def makeStandardBoard():
+    '''
+    Sets up a chessboard with beginning setup of pieces.
+
+    Returns a Board object populated with pieces.
+    '''
+    board = Board()  # Create an empty chessboard.
+    # First, set the pawns.
+    for file in range(8):
+        board.squares[file, 6].set_piece(Pawn('white'))
+        board.squares[file, 1].set_piece(Pawn('black'))
+    # Set the Rooks.
+    for file in (0, 7):
+        board.squares[file, 7].set_piece(Rook('white'))
+        board.squares[file, 0].set_piece(Rook('black'))
+    # Set the Knights.
+    for file in (1, 6):
+        board.squares[file, 7].set_piece(Knight('white'))
+        board.squares[file, 0].set_piece(Knight('black'))
+    # Set the Bishops.
+    for file in (2, 5):
+        board.squares[file, 7].set_piece(Bishop('white'))
+        board.squares[file, 0].set_piece(Bishop('black'))
+    # Set the Queens.
+    board.squares[3, 7].set_piece(Queen('white'))
+    board.squares[3, 0].set_piece(Queen('black'))
+    # Finally, set the Kings.
+    board.white_king = King('white')
+    board.squares[4, 7].set_piece(board.white_king)
+    board.black_king = King('black')
+    board.squares[4, 0].set_piece(board.black_king)
+
+    board.update_pieces()
+
+    return board
 
 
+def makeTwoRooksEndgameBoard(rookColor):
+    '''
+    Sets up a chess board with two rooks and a king versus the other king.
+    
+    rookColor is either 'white' or 'black', depending on which king you want
+    the rooks to be allied with.
+    '''
+    board = Board()
+    if rookColor.lower().startswith('w'):
+        rookColor = 'white'
+        rank = 7
+    elif rookColor.lower().startswith('b'):
+        rookColor = 'black'
+        rank = 0
+    else:
+        print("rookColor must be either 'black' or 'white'.")
+        return None
+    
+    # Set the Rooks.
+    for file in (0, 7):
+        board.squares[file, rank].set_piece(Rook(rookColor))
+    # Set the Kings.
+    board.white_king = King('white')
+    board.squares[4, 7].set_piece(board.white_king)
+    board.black_king = King('black')
+    board.squares[4, 0].set_piece(board.black_king)
+    
+    board.update_pieces()
+    
+    return board
 
-
-
-
+def makeQueenEndgameBoard(queenColor):
+    '''
+    Sets up a chess board with two rooks and a king versus the other king.
+    
+    rookColor is either 'white' or 'black', depending on which king you want
+    the rooks to be allied with.
+    '''
+    board = Board()
+    if queenColor.lower().startswith('w'):
+        queenColor = 'white'
+        rank = 7
+    elif queenColor.lower().startswith('b'):
+        queenColor = 'black'
+        rank = 0
+    else:
+        print("queenColor must be either 'black' or 'white'.")
+        return None
+    
+    # Set the Queen.
+    for file in (0, 7):
+        board.squares[file, rank].set_piece(Queen(queenColor))
+    # Set the Kings.
+    board.white_king = King('white')
+    board.squares[4, 7].set_piece(board.white_king)
+    board.black_king = King('black')
+    board.squares[4, 0].set_piece(board.black_king)
+    
+    board.update_pieces()
+    
+    return board
 
 

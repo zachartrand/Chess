@@ -8,9 +8,7 @@ This file contains classes for the chess pieces.  Should be imported by the
 chess_engine module.
 """
 
-__all__ = [
-    'King', 'Queen', 'Rook', 'Bishop', 'Knight', 'Pawn'
-]
+__all__ = ['King', 'Queen', 'Rook', 'Bishop', 'Knight', 'Pawn']
 
 DIRECTIONS = dict(
     DIAGONAL = (
@@ -41,24 +39,36 @@ DIRECTIONS = dict(
 
 class Piece:
     '''Super class for the different chess pieces.'''
-    
     def __init__(self, color):
         self.square = None   # Square will be set later, start with None.
-        self.name = ''       # Names will be set in subclasses.
-        self.symbol = ''     # Symbols will be set in subclasses.
-        self.image_name = '' # Image filename for the piece. Set in subclasses.
-        self.first_move = None  # Store piece's first move.  Used for castling.
+        self.first_move = None  # Store piece's first move. Used for castling
+            # and en passant.
         self.pin_direction = ()  # Direction from which a piece is pinned.
-        self.directions = ()  # Direction the piece can move in.
-        self.range = 'inf'  # Number of squares a piece can move. For limiting 
-            # King moves.
-        
         if color.lower().startswith('w'):
             self.color = 'white'
         elif color.lower().startswith('b'):
             self.color = 'black'
         else:
-            raise ValueError("color must be 'white' or 'black'.")
+            raise ValueError("The Piece's color must be 'white' or 'black'.")
+        self.image_name = self.color[0] + self.symbol  # Image filename for the
+            # piece.
+        
+    def __eq__(self, other):
+        '''
+        Determines if two pieces are the same piece. Equivalance is determined
+        by checking that the pieces are the same color, the same type (e.g. 
+        both are Queens), and occupy the same square.
+        '''
+        pieceType = type(self)
+        if isinstance(other, pieceType):
+            if (
+                (self.square is not None and other.square is not None)
+                and self.get_coords() == other.get_coords()
+                and self.color == other.color
+            ):
+                return True
+        
+        return False
     
     def get_color(self):
         '''Returns a string of the piece's color, either 'white' or 'black'.'''
@@ -69,8 +79,20 @@ class Piece:
         return self.square
     
     def get_coords(self):
+        '''
+        Returns the coordinates of the piece if the piece is on the board.
+        
+        The value returned is a tuple of the form
+        
+            (file, rank)
+        
+        where both file and rank are indices from 0 to the board 
+        width/height - 1.
+        '''
         if self.is_on_board():
             return self.square.get_coords()
+        
+        return None
     
     def get_square_name(self):
         '''
@@ -82,8 +104,8 @@ class Piece:
         '''
         if self.square is not None:
             return self.get_square().get_name()
-        else:
-            return 'This piece is not on a square.'
+        
+        return 'This piece is not on a square.'
     
     def get_square_color(self):
         '''
@@ -102,21 +124,29 @@ class Piece:
         square.piece = self
     
     def is_on_board(self):
-        '''Returns whether the piece is on the board or not.'''
-        if self.square != None:
+        '''
+        Returns whether the piece is on the board or not.
+        
+        Returns True if the piece is on a square, otherwise returns False.
+        '''
+        if self.square is not None:
             return True
         
         return False
         
     def get_name(self):
-        '''Returns a string of the name of the piece.'''
+        '''
+        Returns the name of the piece.
+        
+        Returns a string of the piece's name, e.g. for a Queen, this function
+        returns 'Queen'.
+        '''
         return self.name
     
     def get_symbol(self):
         '''
         Returns the one-letter symbol for the piece in algebraic notation, 
-        e.g., the Knight is denoted by an 'N'. For pawns, this returns 
-        an empty string.
+        e.g., the Knight is denoted by an 'N'.
         '''
         return self.symbol
     
@@ -129,9 +159,10 @@ class Piece:
         fullname.append(self.get_color().title())
         fullname.append(self.get_name().title())
         if self.get_square() is not None:
+            fullname.append('on')
             fullname.append(self.get_square_name())
         
-        return ('{} {} on {}.'.format(fullname[0], fullname[1], fullname[2]))
+        return ' '.join(fullname)
     
     def get_image_name(self):
         '''
@@ -147,14 +178,14 @@ class Piece:
         piece is on the board.
         '''
         if self.is_on_board():
-            self.square = None
+            self.square.remove_piece(self)
     
     def has_moved(self):
         '''
         Returns True if the piece hasn't moved on the board. 
-        Used for castling.
+        Used for castling and two-square pawn moves.
         '''
-        if self.first_move != None:
+        if self.first_move is not None:
             return True
         
         return False
@@ -163,6 +194,8 @@ class Piece:
         '''Returns the first move of the piece if it has one.'''
         if self.has_moved():
             return self.first_move
+        
+        return None
     
     def is_pinned(self):
         '''Returns True if the piece is pinned to the King.'''
@@ -176,18 +209,16 @@ class Piece:
         return self.pin_direction
     
     def get_directions(self):
-        '''Returns the directions that the piece can move in.'''
+        '''
+        Returns the directions that the piece can move in.
+        
+        Each direction is a tuple with a 0 or 1 in the x and y direction.
+        For example, right and down is represented as (1, 1). This method
+        returns a tuple of direction tuples. Used for determining squares that 
+        the piece can move in.
+        '''
         return self.directions
-        
-    def get_range(self):
-        '''
-        Returns the number of squares along a path the piece can move in.
-        
-        For pieces that can move any number of squares along a path, returns 
-        'inf'.  King returns 1. Pawns have changes to their range based on the
-        first turn, and Knights don't move along paths, so they return None.
-        '''
-        return self.range
+
 
 class Rook(Piece):
     '''
@@ -198,10 +229,11 @@ class Rook(Piece):
     '''
     
     def __init__(self, color):
-        super().__init__(color)
         self.name = 'Rook'
         self.symbol = 'R'
-        self.image_name = self.color[0] + self.symbol
+        
+        super().__init__(color)
+        
         self.directions = DIRECTIONS['HORIZONTAL'] + DIRECTIONS['VERTICAL']
     
 
@@ -214,16 +246,16 @@ class King(Piece):
     '''
     
     def __init__(self, color):
-        super().__init__(color)
         self.name = 'King'
         self.symbol = 'K'
-        self.image_name = self.color[0] + self.symbol
+        
+        super().__init__(color)
+        
         self.directions = (
             DIRECTIONS['HORIZONTAL'] 
             + DIRECTIONS['VERTICAL'] 
             + DIRECTIONS['DIAGONAL']
         )
-        self.range = 1
     
 
 class Queen(Piece):
@@ -236,10 +268,11 @@ class Queen(Piece):
     '''
     
     def __init__(self, color):
-        super().__init__(color)
         self.name = 'Queen'
         self.symbol = 'Q'
-        self.image_name = self.color[0] + self.symbol
+        
+        super().__init__(color)
+        
         self.directions = (
             DIRECTIONS['HORIZONTAL'] 
             + DIRECTIONS['VERTICAL'] 
@@ -251,33 +284,37 @@ class Knight(Piece):
     '''
     Class for the Knight piece.
     
-    A minor piece that moves in an L-pattern.  Can jump over pieces.  
+    A minor piece that moves in an L-pattern. Can jump over pieces. Always 
+    moves to an opposite-color square.
+    
     Also known as a Horse by plebs.
     '''
     
     def __init__(self, color):
-        super().__init__(color)
         self.name = 'Knight'
         self.symbol = 'N'
-        self.image_name = self.color[0] + self.symbol
+        
+        super().__init__(color)
+        
         self.directions = DIRECTIONS['KNIGHT']
-        self.range = None
     
 
 class Bishop(Piece):
     '''
     Class for the Bishop piece.
     
-    A minor piece that moves diagonally any number of squares.
+    A minor piece that moves diagonally any number of squares. Can only move 
+    on squares of the same color.
     '''
     
     def __init__(self, color):
-        super().__init__(color)
         self.name = 'Bishop'
         self.symbol = 'B'
-        self.image_name = self.color[0] + self.symbol
+        
+        super().__init__(color)
+        
         self.directions = DIRECTIONS['DIAGONAL']
-    
+
 
 class Pawn(Piece):
     '''
@@ -288,12 +325,10 @@ class Pawn(Piece):
     '''
     
     def __init__(self, color):
-        super().__init__(color)
         self.name = 'Pawn'
-        self.symbol = ''  # Pawn moves are denoted by the square they moved to,
-            # no symbol for pawn.
-        self.image_name = self.color[0] + 'P'
-        self.range = None
+        self.symbol = 'P'
+        
+        super().__init__(color)
         
         if self.color == 'white':
             self.directions = DIRECTIONS['VERTICAL'][0]
@@ -313,12 +348,6 @@ class Pawn(Piece):
             return True
         
         return False
-
-
-
-
-
-
 
 
 

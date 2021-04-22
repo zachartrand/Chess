@@ -7,6 +7,7 @@ Created on Wed Mar 24 11:26:24 2021
 
 import random as rn
 # from numba import njit
+from joblib import Parallel
 
 
 __all__ = [
@@ -23,7 +24,7 @@ PIECE_SCORE = dict(
 )
 CHECKMATE = PIECE_SCORE['King'] + 1
 STALEMATE = 0
-MAX_DEPTH = 2
+MAX_DEPTH = 3
 
 
 def getRandomMove(validMoves):
@@ -32,9 +33,7 @@ def getRandomMove(validMoves):
 
 
 def getBestMinMaxMove(gs, validMoves):
-    '''
-    Find the best move based on material alone.
-    '''
+    '''Find the best move based on material alone.'''
     turnMultiplier = 1 if gs.white_to_move else -1
     opponentMinMaxScore = CHECKMATE
     bestPlayerMove = None
@@ -71,11 +70,14 @@ def getBestMinMaxMove(gs, validMoves):
     return bestPlayerMove
 
 
-def getBestMove(gs, validMoves):
+def getBestMove(gs):
     '''Helper function to make the first recursive call.'''
     global nextMove
+    validMoves = gs.get_valid_moves()
     nextMove = None
-    getNegaMaxMove(gs, validMoves, MAX_DEPTH, 1 if gs.white_to_move else -1)
+    rn.shuffle(validMoves)
+    getNegaMaxAlphaBetaMove(gs, validMoves, MAX_DEPTH, -CHECKMATE,
+                            CHECKMATE, 1 if gs.white_to_move else -1)
     return nextMove
 
 
@@ -142,6 +144,36 @@ def getNegaMaxMove(gs, validMoves, depth, turnMultiplier):
     return maxScore
 
 
+def getNegaMaxAlphaBetaMove(gs, validMoves, depth, 
+                                  alpha, beta, turnMultiplier):
+    global nextMove
+    if depth == 0:
+        return turnMultiplier * scoreBoard(gs)
+    
+    # Move ordering - look at moves that put opponent in check and captures
+    # first.  Add later.
+    maxScore = -CHECKMATE
+    if validMoves:
+        for move in validMoves:
+            gs.make_move(move)
+            nextMoves = gs.get_valid_moves()
+            score = -1 * getNegaMaxAlphaBetaMove(gs, nextMoves, depth-1, -beta,
+                                                 -alpha, -turnMultiplier)
+            if score > maxScore:
+                maxScore = score
+                if depth == MAX_DEPTH:
+                    nextMove = move
+            
+            gs.undo_move()
+            gs.undo_log.pop()
+            if maxScore > alpha:  # Pruning happens.
+                alpha = maxScore
+            if alpha >= beta:
+                break
+    
+    return maxScore
+
+
 def scoreBoard(gs):
     '''
     Scores the board based on material and attacks.
@@ -159,10 +191,15 @@ def scoreBoard(gs):
     board = gs.board
     score = 0
     for piece in board.get_pieces():
-        if piece.get_color() == 'white':
-            score += PIECE_SCORE[piece.get_name()]
-        elif piece.get_color() == 'black':
-            score -= PIECE_SCORE[piece.get_name()]
+        if piece.is_on_board():
+            if piece.get_color() == 'white':
+                score += PIECE_SCORE[piece.get_name()]
+                if piece.get_name() == 'Pawn' and piece.can_promote():
+                    score += 8
+            elif piece.get_color() == 'black':
+                score -= PIECE_SCORE[piece.get_name()]
+                if piece.get_name() == 'Pawn' and piece.can_promote():
+                    score -= 8
     
     return score
 
@@ -173,10 +210,11 @@ def scoreMaterial(board):
     '''
     score = 0
     for piece in board.get_pieces():
-        if piece.get_color() == 'white':
-            score += PIECE_SCORE[piece.get_name()]
-        elif piece.get_color() == 'black':
-            score -= PIECE_SCORE[piece.get_name()]
+        if piece.is_on_board():
+            if piece.get_color() == 'white':
+                score += PIECE_SCORE[piece.get_name()]
+            elif piece.get_color() == 'black':
+                score -= PIECE_SCORE[piece.get_name()]
     
     return score
 

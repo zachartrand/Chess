@@ -7,24 +7,25 @@ Created on Fri Mar 12 22:29:53 2021
 This is the engine that will run the chess game.
 """
 
+from typing import Union, Tuple
+
 from chess_pieces import Queen, Rook, Bishop, Knight
 from chess_pieces import DIRECTIONS
-from chess_board import makeStandardBoard
+from chess_board import makeStandardBoard, Square
 # from chess_board import makeTwoRooksEndgameBoard, makeQueenEndgameBoard
 
 
 class GameState():
-    '''
-    This class is responsible for storing all the information about the current
-    state of a chess game. It will also be responsible for determining the
-    valid moves at the current state. It will also keep a move log.
-    '''
+    """
+    This class is responsible for storing all the information about the
+    current state of a chess game. It will also be responsible for
+    determining the valid moves at the current state. It will also keep
+    a move log.
+    """
     
     def __init__(self):
         self.board = makeStandardBoard()
-        self.file_size, self.rank_size = (
-            self.board.get_size()[0], self.board.get_size()[1]
-        )
+        self.file_size, self.rank_size = self.board.get_size()
         self.white_to_move = True
         self.move_log = []
         self.undo_log = []
@@ -41,12 +42,13 @@ class GameState():
         self.valid_moves = []
     
     def make_new_move(self, move):
-        '''
-        Makes a new move outside of the moves in the move_log and undo_log.
+        """
+        Makes a new move outside of the moves in the move_log and
+        undo_log.
 
-        Saves the current branch of moves to the move_branches attribute, then
-        clears the undo_log.
-        '''
+        Saves the current branch of moves to the move_branches
+        attribute, then clears the undo_log.
+        """
         if self.undo_log:
             # Clear undo_log after new move if different from previous move.
             self.move_branches.append(self.undo_log)
@@ -63,9 +65,9 @@ class GameState():
         self.make_move(move)
 
     def make_move(self, move):
-        '''
+        """
         Takes a Move as a parameter and executes the move.
-        '''
+        """
         pieces_set, pieces_removed = [], []
         if move.contains_enpassant():
             move.enpassant_square.remove_piece()
@@ -96,17 +98,14 @@ class GameState():
                 self.enpassant_coords = ()
 
         self.white_to_move = not self.white_to_move
-        if self.white_to_move:
-            self.move_number += 1
+        self.move_number += 1
         self.board.update_pieces(pieces_set, pieces_removed)
     
     def undo_move(self):
-        '''Method to undo a chess move.'''
+        """Method to undo a chess move."""
         if self.move_log:
             pieces_set, pieces_removed = [], []
             move, stalemate_counter = self.move_log.pop()
-            if stalemate_counter > 0:
-                self.stalemate_counter = stalemate_counter - 1
             move.end_square.remove_piece()
             move.start_square.set_piece(move.piece_moved)
             if move.piece_captured is not None:
@@ -139,27 +138,27 @@ class GameState():
             if self.stalemate:
                 self.stalemate = False
             self.white_to_move = not self.white_to_move
-            if not self.white_to_move:
-                self.move_number -= 1
+            self.move_number -= 1
             self.undo_log.append((move, stalemate_counter))
             self.board.update_pieces(pieces_set, pieces_removed)
 
     def redo_move(self):
-        '''Redo a previously undone move.'''
+        """Redo a previously undone move."""
         if self.undo_log:
             move, _ = self.undo_log.pop()
             self.make_move(move)
 
     def get_valid_moves(self):
-        '''
+        """
         Get all moves considering checks.
 
         1. Get the King from the side moving this turn.
-        2. Figure out if the King is in check, and if so, by how many pieces.
+        2. Figure out if the King is in check, and if so, by how many
+           pieces.
         3. Remove all moves that put the King into check.
-        4. If the King hasn't moved, find all castling moves and determine if
-           they are valid.
-        '''
+        4. If the King hasn't moved, find all castling moves and
+        determine if they are valid.
+        """
         moves = []
         if self.white_to_move:
             king = self.board.white_king
@@ -169,7 +168,7 @@ class GameState():
             return []
         self.pins, self.checks = self.get_pins_and_checks(king)
 # =============================================================================
-#       Lines for debugging pins and checks.
+#         # Lines for debugging pins and checks.
 #         if self.pins:
 #             for pin in self.pins:
 #                 print('Pin on {}'.format(
@@ -253,7 +252,7 @@ class GameState():
         return moves
 
     def get_castle_moves(self, king, moves):
-        '''Adds castling moves to valid moves.'''
+        """Adds castling moves to valid moves."""
         s = self.board.squares
         kingFile, kingRank = king.get_coords()
         kingSquare = king.get_square()
@@ -294,10 +293,12 @@ class GameState():
                                     break
 
     def get_all_moves(self):
-        '''Get all moves without considering checks.'''
+        """Get all moves without considering checks."""
         moves = []
         for piece in self.board.get_pieces():
             if piece.is_on_board():  # Needed for AI to work properly.
+                # BUG: AI somehow still tries to make moves where the
+                # start square has no piece.
                 turn = piece.get_color()
                 name = piece.get_name()
                 if (
@@ -318,27 +319,27 @@ class GameState():
         return moves
 
     def is_piece_pinned(self, piece):
-        '''Checks if the piece is pinned to the King in any direction.'''
-        piece.pin_direction = ()
-        for pin in reversed(self.pins):
-            if pin[0] == piece.get_square():
-                piece.pin_direction = pin[1]
-                self.pins.remove(pin)
-                break
+        """Checks if the piece is pinned to the King in any direction."""
+        if piece.get_name() != 'King':
+            piece.pin_direction = ()
+            for pin in reversed(self.pins):
+                if pin[0] == piece.get_square():
+                    piece.pin_direction = pin[1]
+                    self.pins.remove(pin)
+                    break
 
     def get_pawn_moves(self, pawn, moves):
-        '''
+        """
         Gets all possible moves for the Pawn.
 
-        Allows for double move on beginning rank, forward movement unless
-        obstructed by a piece, and diagonal capture.
-        '''
+        Allows for double move on beginning rank, forward movement
+        unless obstructed by a piece, and diagonal capture.
+        """
         board = self.board
         s = board.squares
         f, r = pawn.get_coords()
         startSquare = s[f, r]
         y = pawn.get_directions()[1]
-        # enpassantRank = pawn.get_promotion_rank() - y*3
 
         # Vertical moves
         if (not pawn.is_pinned()
@@ -382,70 +383,76 @@ class GameState():
             moves.append(move)
 
     def get_king_and_knight_moves(self, piece, moves):
-        '''
+        """
         Generate moves for the King and Knight pieces.
 
-        The King moves only one space in any direction, so there's no need to
-        check for squares on a path.
+        The King moves only one space in any direction, so there's no
+        need to check for squares on a path.
 
-        The Knight is the only piece that can jump, so the only thing this
-        needs to do is check the, at most, eight (8) squares that it could
-        move to and see if a friendly piece is there.  The Knight moves in an
-        L shape: 2 squares in one direction, and 1 move to the side.
-        '''
-        if not piece.is_pinned():
-            f, r = piece.get_coords()
-            s = self.board.squares
-            for x, y in piece.get_directions():
-                endFile, endRank = f+x, r+y
-                if (
-                    (0 <= endFile < self.file_size)
-                    and (0 <= endRank < self.rank_size)
-                ):
-                    if not s[endFile, endRank].has_friendly_piece(piece):
-                        moves.append(
-                            Move(s[f, r], s[endFile, endRank],
-                                 self.move_number)
-                        )
-
-    def find_moves_on_path(self, piece, moves):
-        '''
-        Finds all squares along a horizontal, vertical, or diagonal path and
-        adds them to the move list.
-        '''
-        start_square = piece.get_square()
-        f, r = start_square.get_coords()
-        if self.file_size >= self.rank_size:
-            pathRange = self.file_size
-        else:
-            pathRange = self.rank_size
-        for direction in piece.get_directions():
-            x, y = direction
-            if (not piece.is_pinned()
-                or piece.get_pin_direction() == direction
-                or piece.get_pin_direction() == (-x, -y)):
-                for i in range(1, pathRange):
-                    file, rank = f + x*i, r + y*i
-                    if (0 <= file < self.file_size
-                        and 0 <= rank < self.rank_size):
-                        path_square = self.board.squares[file, rank]
-                        if path_square.has_piece():
-                            if path_square.has_friendly_piece(piece):
-                                break
-                            elif path_square.has_enemy_piece(piece):
-                                moves.append(Move(
-                                    start_square, path_square,
-                                    self.move_number
-                                    ))
-                                break
-                        else:
+        The Knight is the only piece that can jump, so the only thing
+        this needs to do is check the, at most, eight (8) squares that
+        it could move to and see if a friendly piece is there.  The
+        Knight moves in an L shape: 2 squares in one direction, and 1
+        move to the side.
+        """
+        if piece.is_on_board():  # Possible fix to AI bug.
+            if not piece.is_pinned():
+                f, r = piece.get_coords()
+                s = self.board.squares
+                for x, y in piece.get_directions():
+                    endFile, endRank = f+x, r+y
+                    if (
+                        (0 <= endFile < self.file_size)
+                        and (0 <= endRank < self.rank_size)
+                    ):
+                        if not s[endFile, endRank].has_friendly_piece(piece):
+                            if piece.get_coords() != s[f, r].get_coords():
+                                print(f'Piece square: {piece.get_coords()}')
+                                print(f'Move square: {s[f, r].get_coords()}')
                             moves.append(
-                                Move(start_square, path_square,
+                                Move(s[f, r], s[endFile, endRank],
                                      self.move_number)
                             )
 
+    def find_moves_on_path(self, piece, moves):
+        """
+        Finds all squares along a horizontal, vertical, or diagonal
+        path and adds them to the move list.
+        """
+        if piece.is_on_board():
+            start_square = piece.get_square()
+            f, r = start_square.get_coords()
+            if self.file_size >= self.rank_size:
+                pathRange = self.file_size
+            else:
+                pathRange = self.rank_size
+            for direction in piece.get_directions():
+                x, y = direction
+                if (not piece.is_pinned()
+                    or piece.get_pin_direction() == direction
+                    or piece.get_pin_direction() == (-x, -y)):
+                    for i in range(1, pathRange):
+                        file, rank = f + x*i, r + y*i
+                        if (0 <= file < self.file_size
+                            and 0 <= rank < self.rank_size):
+                            path_square = self.board.squares[file, rank]
+                            if path_square.has_piece():
+                                if path_square.has_friendly_piece(piece):
+                                    break
+                                elif path_square.has_enemy_piece(piece):
+                                    moves.append(Move(
+                                        start_square, path_square,
+                                        self.move_number
+                                        ))
+                                    break
+                            else:
+                                moves.append(
+                                    Move(start_square, path_square,
+                                         self.move_number)
+                                )
+
     def get_pins_and_checks(self, king, king_end_square=None):
-        '''Finds all pinned pieces and checks.'''
+        """Finds all pinned pieces and checks."""
         pins = []
         checks = []
         if king_end_square is None:
@@ -482,19 +489,17 @@ class GameState():
                         piece = square.get_piece()
                         name = piece.get_name()
                         color = square.get_piece().get_color()
-                        # Five possibilities in this complex conditional:
-                        # 1. In a cardinal direction away from the king
-                        #    and the piece is a Rook.
-                        # 2. Diagonally away from the king and the piece
-                        #    is a Bishop.
-                        # 3. One square away diagonally from the king and
-                        #    the piece is a Pawn.
-                        # 4. Any direction and the piece is a queen.
-                        # 5. Any direction one square away and the piece
+                        # Three possibilities in this complex conditional:
+                        # 1. Any direction one square away and the piece
                         #    is a King (to prevent kings from attacking
                         #    each other.
+                        # 2. One square away diagonally from the king and
+                        #    the piece is a Pawn.
+                        # 3. Is any other piece and the King is in one of the 
+                        #    directions that that piece can move in.
+                        
                         if (
-                            (name == 'King' and (i, j) == (1, 1))
+                            (name, i, j) == ('King', 1, 1)
                              or (name == 'Pawn' 
                                      and ((color == 'black'
                                            and (x, y) in ((1, -1), (-1, -1)) 
@@ -538,7 +543,7 @@ class GameState():
         return pins, checks
 
     def promote(self, choice, move):
-        '''Promotes Pawn to Queen, Knight, Rook, or Bishop.'''
+        """Promotes Pawn to Queen, Knight, Rook, or Bishop."""
         if move.piece_moved.get_name() == 'Pawn':
             PROMOTION = dict(
                 q = Queen,
@@ -554,10 +559,10 @@ class GameState():
             raise ValueError('Only Pawns can be promoted.')
 
     def find_mate(self, validMoves):
-        '''
+        """
         Determines if the game is over
         and whether it is checkmate or stalemate.
-        '''
+        """
         if not validMoves:
             if self.in_check:
                 self.checkmate = True
@@ -570,14 +575,15 @@ class GameState():
 
 
 class Move():
-    '''
+    """
     Object to store chess moves in.
 
     Moves will be stored in the move_log attribute of the GameState().
-    '''
+    """
 
-    def __init__(self, startSquare, endSquare, moveNumber,
-                 castle=(), enpassantSquare=None):
+    def __init__(self, startSquare: Square, endSquare: Square, moveNumber: int,
+            castle: Tuple[Union[Rook, Square]]=(),
+            enpassantSquare: Union[Square, None]=None):
         if not startSquare.has_piece():
             raise ValueError('Square {} has no piece to move.'.format(
                 startSquare.get_name()))
@@ -593,14 +599,14 @@ class Move():
         self.id = (
             self.move_number,
 
-            self.piece_moved,
+            id(self.piece_moved),
 
             self.start_square.get_file() * 1000
             + self.start_square.get_rank() * 100
             + self.end_square.get_file() * 10
             + self.end_square.get_rank() * 1,
 
-            self.piece_captured
+            id(self.piece_captured),
         )
         self.name = ''  # The name in algebraic notation needs the gamestate 
             # to figure out the full notation. Generated when a move is made.
@@ -610,11 +616,14 @@ class Move():
             return self.id == other.id
 
         return False
+    
+    def __hash__(self):
+        return hash(self.id)
 
-    def get_chess_notation(self, gs):
-        '''
+    def get_chess_notation(self, gs: GameState):
+        """
         Returns the move in algebraic notation.
-        '''
+        """
         # TODO: Check if pieces of the same name are on the same rank as the
         # piece moved in case more specific notation is needed.
         if self.contains_castle():
@@ -695,7 +704,7 @@ class Move():
                 ])
 
     def __str__(self):
-        number = str(self.move_number + 1)
+        number = str(self.move_number//2 + 1)
         if self.piece_moved.get_color() == 'black':
             spacer = '...'
         else:
@@ -704,7 +713,7 @@ class Move():
         return ''.join([number, spacer, self.name])
 
     def contains_promotion(self):
-        '''Returns whether or not a promotion occured during this move.'''
+        """Returns whether or not a promotion occured during this move."""
         if self.promotion_piece is not None:
             return True
 
@@ -721,12 +730,3 @@ class Move():
             return True
 
         return False
-
-
-
-
-
-
-
-
-

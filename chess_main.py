@@ -1,25 +1,24 @@
 #!/usr/bin/env python3
-
 # -*- coding: utf-8 -*-
+
 """
 Created on Fri Mar 12 23:47:52 2021
 
-@author: Zach
+@author: Zach Chartrand
 
-This is the main chess program where GUI and user interactions are programmed.
-
+This is the main chess program where GUI
+and user interactions are programmed.
 """
 
 import os
 import sys
+import shelve
 
 import pygame as p
 
 import chess_engine
-# from chess_pieces import DIRECTIONS
 import chess_ai as ai
-import chess_themes as themes
-
+from chess_themes import themes
 
 CAPTION = 'Chess'
 WIDTH = HEIGHT = 720                    # Width and height of board in pixels.
@@ -29,21 +28,24 @@ MAX_FPS = 120                           # For animations later on.
 IMAGES = {}                             # Setup for loadImages().
 FLIPPEDBOARD = [i for i in reversed(range(DIMENSION))]  # For getting screen
     # coordinates when the board is drawn from Black's perspective.
+UPSIDEDOWN = False
 
 
 def main():
-    '''
+    """
     The main driver for our code.
 
     This will handle user input and updating the graphics.
-    '''
-    global screen, clock, theme, gs, highlight_last_move
+    """
+    global screen, clock, theme, gs, highlight_last_move, UPSIDEDOWN
     p.init()
     screen = p.display.set_mode((WIDTH, HEIGHT))
     p.display.set_caption(CAPTION)
     clock = p.time.Clock()
     screen.fill(p.Color(28, 28, 28))
-    theme = themes.blue  # TODO: In GUI, make this variable customizable.
+    with shelve.open(os.path.join('settings', 'settings')) as settings:
+        # TODO: In GUI, make this variable customizable.
+        theme = themes[settings['theme']]
     gs = chess_engine.GameState()
     board = gs.board
     squares = board.squares
@@ -56,12 +58,14 @@ def main():
         # clicked by user
     playerClicks = []  # Keep track of player clicks
         # (two tuples: [(4, 6), (4, 4)] would be (e2 pawn to) e4)
-    gs.upside_down = False
     highlight_last_move = True
     humanWhite = True  # True if human player is white.
     humanBlack = True  # True if human player is black.
     if humanBlack and not humanWhite:
-        gs.upside_down = True
+        UPSIDEDOWN = True
+    
+    # TODO: Add statement that saves user settings (e.g., theme) using the 
+        # shelve module.
     
     while True:
         humanTurn = ((gs.white_to_move and humanWhite)
@@ -78,7 +82,7 @@ def main():
                     location = p.mouse.get_pos()  # (x, y) location of the mouse.
                     file = location[0] // SQ_SIZE
                     rank = location[1] // SQ_SIZE
-                    if gs.upside_down:
+                    if UPSIDEDOWN:
                         file, rank = FLIPPEDBOARD[file], FLIPPEDBOARD[rank]
                     if squareClicked == (file, rank):  # User clicked the same
                         # square twice.
@@ -136,7 +140,7 @@ def main():
                     or event.key == p.K_LEFT
                     or event.key == p.K_a):
                     if gs.move_log:
-                        gs.undo_move()
+                        board.update_pieces(gs.undo_move())
                         move = gs.undo_log.copy().pop()[0]
                         animateMove(move, validMoves, undo=True)
                         # For debugging.
@@ -156,11 +160,12 @@ def main():
                         moveMade = True
 
         # AI move finder
-        if (not gs.gameover and not humanTurn
-                and not gs.undo_log and not moveMade):
+        if (not moveMade and not gs.gameover and not humanTurn
+                and not gs.undo_log):
             AIMove = ai.getBestMove(gs)
             if AIMove is None:
                 AIMove = ai.getRandomMove(validMoves)
+            p.time.wait(200)
             gs.make_new_move(AIMove)
             animateMove(AIMove, validMoves)
             printMove(AIMove)  # For debugging.
@@ -191,8 +196,8 @@ def main():
             elif gs.stalemate:
                 if gs.stalemate_counter > 100:
                     drawText('Stalemate', 48)
-                    drawText('50 moves have gone by without\n', 36)
-                    drawText('a capture or pawn move.', 36)
+                    drawText('50 moves have gone by without\n', 36, yoffset=10)
+                    drawText('a capture or pawn move.', 36, yoffset=20)
                 else:
                     drawText('Stalemate: no legal moves.', 36)
 
@@ -201,11 +206,12 @@ def main():
 
 
 def loadImages():
-    '''
+    """
     Initialize a global dictionary of images.
 
-    This will be called exactly once in the main(), before the while: loop.
-    '''
+    This will be called exactly once in the main(),
+    before the while: loop.
+    """
     colors = ['w', 'b']
     pieces = ['K', 'Q', 'R', 'B', 'N', 'P']
     for color in colors:
@@ -219,9 +225,9 @@ def loadImages():
 
 
 def drawGameState(validMoves):
-    '''
+    """
     Responsible for all the graphics within a current gamestate.
-    '''
+    """
     # Draw squares on the board.
     drawBoard(validMoves)
     if highlight_last_move:
@@ -234,9 +240,9 @@ def drawGameState(validMoves):
 
 
 def drawBoard(validMoves):
-    '''
+    """
     Draw the squares on the board.
-    '''
+    """
     global selectedSquare
     selectedSquare = None
     squares = gs.board.squares.T.flat
@@ -255,7 +261,7 @@ def drawBoard(validMoves):
 
 
 def highlightLastMove():
-    '''Highlights the start and end square of the last piece that moved.'''
+    """Highlights the start and end square of the last piece that moved."""
     # Get last move.
     if gs.move_log:
         lastMove = gs.move_log.copy().pop()[0]
@@ -294,6 +300,10 @@ def highlightLastMove():
 
 
 def highlightSquares(validMoves):
+    """
+    Highlights squares on the board
+    related to the current selected piece.
+    """
     file, rank = getSquareCoordinates(selectedSquare)
     color = getSquareThemeHighlightColor(selectedSquare)
 
@@ -324,6 +334,7 @@ def highlightSquares(validMoves):
             attackSquare.set_alpha(255)
             screen.blit(attackSquare, (file * SQ_SIZE, rank * SQ_SIZE,))
 # =============================================================================
+# This is for using circles instead of highlighting the square.
 #             p.draw.circle(
 #                 attackSquare,
 #                 'red',
@@ -335,9 +346,9 @@ def highlightSquares(validMoves):
 
 
 def drawPieces():
-    '''
+    """
     Draw the pieces on the board using the current GameState.board.
-    '''
+    """
     pieces = gs.board.get_pieces()
     for piece in pieces:
         if piece.is_on_board():  # Needed to fix AI bug, apparently.
@@ -352,13 +363,13 @@ def drawPieces():
 
 
 def markMovementSquares(square, validMoves):
-    '''
-    Finds the squares that the selected piece can move to and stores them as
-    two lists.
+    """
+    Finds the squares that the selected piece can move to and stores
+    them as two lists.
 
-    These lists are used in the drawBoard function to highlight move and
-    capture squares of the selected piece.
-    '''
+    These lists are used in the drawBoard function to highlight move
+    and capture squares of the selected piece.
+    """
     moveSquares = []
     captureSquares = []
     for move in validMoves:
@@ -373,10 +384,10 @@ def markMovementSquares(square, validMoves):
 
 
 def animateMove(move, validMoves, undo=False):
-    '''
+    """
     Animates pieces when they are moved,
     including undoing and redoing moves.
-    '''
+    """
     # Get move info.
     pieceMoved = move.piece_moved
     pieceCaptured = move.piece_captured
@@ -432,9 +443,9 @@ def animateMove(move, validMoves, undo=False):
 
 def drawAnimationFrame(pieceMoved, pieceCaptured, startFile, startRank, dFile,
         dRank, endFile, endRank, frame, framesPerMove):
-    '''
+    """
     Draws a single frame of animation.
-    '''
+    """
     file, rank = (startFile + dFile*frame/framesPerMove,
                   startRank + dRank*frame/framesPerMove)
     # Draw moving piece.
@@ -443,10 +454,10 @@ def drawAnimationFrame(pieceMoved, pieceCaptured, startFile, startRank, dFile,
 
 
 def selectSquare(square):
-    '''
+    """
     Adds a flag to highlight the square that is clicked on if the piece
     color is the same as the turn.
-    '''
+    """
     if not square.is_selected():
         color = square.get_piece().get_color()
         if ((color == 'white' and gs.white_to_move)
@@ -455,16 +466,16 @@ def selectSquare(square):
 
 
 def deselectSquare(square):
-    '''Deselects a selected square.'''
+    """Deselects a selected square."""
     if square.is_selected():
         square.selected = False
 
 
 def getSquareThemeColor(square):
-    '''
-    Returns the square color for the given square on the chessboard to be
-    rendered on screen.
-    '''
+    """
+    Returns the square color for the given square on the chessboard
+    to be rendered on screen.
+    """
     if square.get_color() == 'light':
         return theme[0]
     elif square.get_color() == 'dark':
@@ -472,10 +483,10 @@ def getSquareThemeColor(square):
 
 
 def getSquareThemeHighlightColor(square):
-    '''
+    """
     Returns the highlighted square color for the given square on the
     chessboard to be rendered on screen.
-    '''
+    """
     if square.get_color() == 'light':
         return theme[2]
     elif square.get_color() == 'dark':
@@ -483,19 +494,20 @@ def getSquareThemeHighlightColor(square):
 
 
 def getSquareCoordinates(square):
-    '''
+    """
     Returns the coordinates of the given square as seen on screen.
-    Takes into account whether the board is seen from Black's perspective.
-    '''
+    Takes into account whether the board is seen from Black's
+    perspective.
+    """
     file, rank = square.get_coords()
-    if gs.upside_down:
+    if UPSIDEDOWN:
         file, rank = FLIPPEDBOARD[file], FLIPPEDBOARD[rank]
 
     return (file, rank)
 
 
 def promoteMenu(move):
-    '''Simple text menu for when pawns get promoted.'''
+    """Simple text menu for when pawns get promoted."""
     choices = 'qkrb'
     print('What would you like to promote your Pawn to?')
     i = input('q = Queen, k = Knight, b = Bishop, r = Rook\n')
@@ -509,15 +521,16 @@ def promoteMenu(move):
 def printMove(move):
     number = ''
     if move.piece_moved.get_color() == 'white':
-        number = str(move.move_number + 1) + '. '
+        number = str(move.move_number//2 + 1) + '. '
     print(''.join([number, move.name]), end=' ')
 
 
 def drawText(text, font_size, font='Helvetica', othickness=3, xoffset=0,
         yoffset=0):
-    '''
-    Draws white text with a black (pseudo-) outline centered on the screen.
-    '''
+    """
+    Draws white text with a black (pseudo-) outline
+    centered on the screen.
+    """
     font = p.font.SysFont(font, font_size, True, False)
     textObject = font.render(text, True, (245, 245, 245))
     textRect = textObject.get_rect()
@@ -525,6 +538,8 @@ def drawText(text, font_size, font='Helvetica', othickness=3, xoffset=0,
         screen.get_rect().centerx, screen.get_rect().centery - HEIGHT // 15
     )
 # =============================================================================
+# Poor man's function for making a black outline around the text. Find out if
+# Pygame has a way of doing this properly.
 #     textOutline = font.render(text, True, (28, 28, 28))
 #     for i in range(1, othickness):
 #         for x, y in (DIRECTIONS['HORIZONTAL'] + DIRECTIONS['VERTICAL']
@@ -535,7 +550,7 @@ def drawText(text, font_size, font='Helvetica', othickness=3, xoffset=0,
 
 
 def exitGame():
-    '''Exits Pygame.'''
+    """Exits Pygame."""
     p.quit()
     sys.exit()
 

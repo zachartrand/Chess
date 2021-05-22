@@ -12,7 +12,6 @@ from typing import Union, Tuple
 from chess_pieces import Queen, Rook, Bishop, Knight
 from chess_pieces import DIRECTIONS
 from chess_board import makeStandardBoard, Square
-# from chess_board import makeTwoRooksEndgameBoard, makeQueenEndgameBoard
 
 
 class GameState():
@@ -624,8 +623,6 @@ class Move():
         """
         Returns the move in algebraic notation.
         """
-        # TODO: Check if pieces of the same name are on the same rank as the
-        # piece moved in case more specific notation is needed.
         if self.contains_castle():
             rookFile = self.castle[1].get_coords()[0]
             kingFile = self.start_square.get_coords()[0]

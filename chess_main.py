@@ -12,13 +12,13 @@ and user interactions are programmed.
 
 import os
 import sys
-import shelve
 
 import pygame as p
 
 import chess_engine
 import chess_ai as ai
 from chess_themes import themes
+from chess_menu import mainMenu
 
 CAPTION = 'Chess'
 WIDTH = HEIGHT = 720                    # Width and height of board in pixels.
@@ -38,14 +38,15 @@ def main():
     This will handle user input and updating the graphics.
     """
     global screen, clock, theme, gs, highlight_last_move, UPSIDEDOWN
+    humanWhite, humanBlack, theme_name = mainMenu()
+    if theme_name not in themes.keys():
+        theme_name = "blue"
     p.init()
     screen = p.display.set_mode((WIDTH, HEIGHT))
     p.display.set_caption(CAPTION)
     clock = p.time.Clock()
     screen.fill(p.Color(28, 28, 28))
-    with shelve.open(os.path.join('settings', 'settings')) as settings:
-        # TODO: In GUI, make this variable customizable.
-        theme = themes[settings['theme']]
+    theme = themes[theme_name]
     gs = chess_engine.GameState()
     board = gs.board
     squares = board.squares
@@ -59,8 +60,8 @@ def main():
     playerClicks = []  # Keep track of player clicks
         # (two tuples: [(4, 6), (4, 4)] would be (e2 pawn to) e4)
     highlight_last_move = True
-    humanWhite = True  # True if human player is white.
-    humanBlack = True  # True if human player is black.
+    # humanWhite = True  # True if human player is white.
+    # humanBlack = True  # True if human player is black.
     if humanBlack and not humanWhite:
         UPSIDEDOWN = True
     

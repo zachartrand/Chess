@@ -6,13 +6,11 @@ Created on Wed Mar 24 11:26:24 2021
 """
 
 import random as rn
-# from numba import njit
-# from joblib import Parallel
+from copy import copy
+# from multiprocessing import Pool
 
 
-__all__ = [
-    'getRandomMove', 'getBestMove'
-]
+__all__ = ['getRandomMove', 'getBestMove']
 
 PIECE_SCORE = dict(
     King = 9000,
@@ -24,16 +22,16 @@ PIECE_SCORE = dict(
 )
 CHECKMATE = PIECE_SCORE['King'] + 1
 STALEMATE = 0
-MAX_DEPTH = 2
+MAX_DEPTH = 3
 
 
 def getRandomMove(validMoves):
-    '''Picks and returns a random move.'''
+    """Picks and returns a random move."""
     return validMoves[rn.randint(0, len(validMoves)-1)]
 
 
 def getBestMinMaxMove(gs, validMoves):
-    '''Find the best move based on material alone.'''
+    """Find the best move based on material alone."""
     turnMultiplier = 1 if gs.white_to_move else -1
     opponentMinMaxScore = CHECKMATE
     bestPlayerMove = None
@@ -71,9 +69,10 @@ def getBestMinMaxMove(gs, validMoves):
 
 
 def getBestMove(gs):
-    '''Helper function to make the first recursive call.'''
+    """Helper function to make the first recursive call."""
     global nextMove
-    validMoves = gs.get_valid_moves()
+    gs = copy(gs)
+    validMoves = gs.valid_moves
     nextMove = None
     rn.shuffle(validMoves)
     getNegaMaxAlphaBetaMove(gs, validMoves, MAX_DEPTH, -CHECKMATE,
@@ -82,7 +81,7 @@ def getBestMove(gs):
 
 
 def getMinMaxMove(gs, validMoves, whiteToMove, depth):
-    '''Recursive function for finding the best AI move.'''
+    """Recursive function for finding the best AI move."""
     global nextMove
     if depth == 0:
         return scoreMaterial(gs.board)
@@ -119,9 +118,9 @@ def getMinMaxMove(gs, validMoves, whiteToMove, depth):
 
 
 def getNegaMaxMove(gs, validMoves, depth, turnMultiplier):
-    '''
+    """
     
-    '''
+    """
     global nextMove
     if depth == 0:
         return turnMultiplier * scoreBoard(gs)
@@ -144,8 +143,8 @@ def getNegaMaxMove(gs, validMoves, depth, turnMultiplier):
     return maxScore
 
 
-def getNegaMaxAlphaBetaMove(gs, validMoves, depth, 
-                                  alpha, beta, turnMultiplier):
+def getNegaMaxAlphaBetaMove(
+        gs, validMoves, depth, alpha, beta, turnMultiplier):
     global nextMove
     if depth == 0:
         return turnMultiplier * scoreBoard(gs)
@@ -154,6 +153,7 @@ def getNegaMaxAlphaBetaMove(gs, validMoves, depth,
     # first.  Add later.
     maxScore = -CHECKMATE
     if validMoves:
+        # p = Pool(len(validMoves))
         for move in validMoves:
             gs.make_move(move)
             nextMoves = gs.get_valid_moves()
@@ -175,11 +175,11 @@ def getNegaMaxAlphaBetaMove(gs, validMoves, depth,
 
 
 def scoreBoard(gs):
-    '''
+    """
     Scores the board based on material and attacks.
     
     A positive score is good for white, and a negative score is good for black.
-    '''
+    """
     if gs.checkmate:
         if gs.white_to_move:
             return -CHECKMATE
@@ -205,9 +205,9 @@ def scoreBoard(gs):
 
 
 def scoreMaterial(board):
-    '''
+    """
     Score the board based on material.
-    '''
+    """
     score = 0
     for piece in board.get_pieces():
         if piece.is_on_board():
@@ -217,6 +217,11 @@ def scoreMaterial(board):
                 score -= PIECE_SCORE[piece.get_name()]
     
     return score
+
+
+
+
+
 
 
 

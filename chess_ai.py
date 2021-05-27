@@ -7,7 +7,6 @@ Created on Wed Mar 24 11:26:24 2021
 
 import random as rn
 from copy import copy
-# from multiprocessing import Pool
 
 
 __all__ = ['getRandomMove', 'getBestMove']

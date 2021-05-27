@@ -12,6 +12,7 @@ from typing import Union, Tuple
 from chess_pieces import Queen, Rook, Bishop, Knight
 from chess_pieces import DIRECTIONS
 from chess_board import makeStandardBoard, Square
+# from chess_board import makeTwoRooksEndgameBoard, makeQueenEndgameBoard
 
 
 class GameState():
@@ -93,7 +94,11 @@ class GameState():
                 and (abs(move.end_square.get_rank()
                          - move.start_square.get_rank()) == 2)):
                 self.enpassant_coords = move.piece_moved.get_coords()
-            elif self.enpassant_coords != ():
+            elif (self.enpassant_coords
+                  or move.piece_moved.get_name() != "Pawn"):
+                self.enpassant_coords = ()
+        else:
+            if self.enpassant_coords:
                 self.enpassant_coords = ()
 
         self.white_to_move = not self.white_to_move
@@ -121,7 +126,7 @@ class GameState():
                 rookStartSquare.set_piece(rook)
             if move.contains_promotion():
                 pieces_removed.append(move.promotion_piece)
-            if self.move_log:
+            if self.move_log:  # Needed to prevent AI bugs.
                 previousMove, _ = self.move_log.copy().pop()
                 if (previousMove.piece_moved.get_name() == 'Pawn'
                         and (abs(previousMove.end_square.get_rank()
@@ -623,6 +628,8 @@ class Move():
         """
         Returns the move in algebraic notation.
         """
+        # TODO: Check if pieces of the same name are on the same rank as the
+        # piece moved in case more specific notation is needed.
         if self.contains_castle():
             rookFile = self.castle[1].get_coords()[0]
             kingFile = self.start_square.get_coords()[0]

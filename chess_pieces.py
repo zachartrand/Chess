@@ -41,13 +41,27 @@ DIRECTIONS = dict(
         (-2, 1),   # Left 2, Down 1
         (2, -1),   # Right 2, Up 1
         (2, 1),    # Right 2, Down 1
-    )
+    ),
 )
 
 
 class Piece:
-    """Super class for the different chess pieces."""    
+    """
+    Super class for the different chess pieces.
+    
+    The only input needed to create a piece is the color of the
+    piece. The type of piece is determined by the subclass called
+    when creating the Piece object. This class should never be
+    used to create an object outside of its subclasses.
+    """    
     def __init__(self, color: str) -> None:
+        """
+        Args:
+            color - 'white' or 'black'
+        """
+        # Piece.name and Piece.symbol are set in subclasses. Methods
+        # using Piece.name and Piece.symbol should not raise errors as
+        # long as objects are created only through Piece's subclasses.
         if color.lower().startswith('w'):
             self.color = 'white'
         elif color.lower().startswith('b'):

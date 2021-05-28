@@ -96,9 +96,8 @@ class GameState():
             elif (self.enpassant_coords
                   or move.piece_moved.get_name() != "Pawn"):
                 self.enpassant_coords = ()
-        else:
-            if self.enpassant_coords:
-                self.enpassant_coords = ()
+        elif self.enpassant_coords:
+            self.enpassant_coords = ()
 
         self.white_to_move = not self.white_to_move
         self.move_number += 1

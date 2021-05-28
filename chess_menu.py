@@ -61,7 +61,6 @@ def mainMenu():
     rBtn_Random.place(x=380, y=90)
     
     # Theme
-    theme_chosen = False
     tk.Label(
         root, text="Theme:", font="Helvetica 14 bold", **TEXT_KWARGS).place(
             x=20, y=132)

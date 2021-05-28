@@ -65,9 +65,7 @@ def main():
     if humanBlack and not humanWhite:
         UPSIDEDOWN = True
     
-    # TODO: Add statement that saves user settings (e.g., theme) using the 
-        # shelve module.
-    
+    # Main loop.
     while True:
         humanTurn = ((gs.white_to_move and humanWhite)
                       or (not gs.white_to_move and humanBlack))

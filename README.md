@@ -1,6 +1,6 @@
 ## Object-oriented chess engine.
 
-<img src='images/screenshot.png', width=60%, alt='Chess Program Screenshot'>
+![Chess Program Screenshot](images/screenshot.png)
 
 ### Downloads
 

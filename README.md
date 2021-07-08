@@ -1,6 +1,6 @@
 ## Object-oriented chess engine.
 
-<img src='images/screenshot.png' width=60% alt='Chess Program Screenshot'>
+<img src='images/screenshot.png' width='60%' alt='Chess Program Screenshot'>
 
 ### Downloads
 
@@ -12,7 +12,7 @@ You can clone the repository with the following terminal command:
 $ git clone https://github.com/zachartrand/Chess.git
 ```
 
-Or you can download the .zip file [here](archive/refs/heads/main.zip).
+Or you can download the .zip file [here](https://github.com/zachartrand/Chess/archive/refs/heads/main.zip).
 
 #### Dependencies
 
@@ -22,11 +22,11 @@ Download the latest version [here](https://www.python.org/downloads/).
 
 ##### Pygame
 
-Download instructions here:  https://www.pygame.org/wiki/GettingStarted
+Download instructions here:  <https://www.pygame.org/wiki/GettingStarted>
 
 ##### NumPy
 
-Download instructions here: https://numpy.org/install/
+Download instructions here: <https://numpy.org/install/>
 
 ### How to run.
 
@@ -52,7 +52,7 @@ this exercise.
 The chess_engine and chess_main were made following the YouTube tutorial by Eddie 
 Sharick, found here:  
     
-* https://youtu.be/EnYui0e73Rs&list=PLBwF487qi8MGU81nDGaeNE1EnNEPYWKY_
+* <https://youtu.be/EnYui0e73Rs&list=PLBwF487qi8MGU81nDGaeNE1EnNEPYWKY_>
     
 and then modified to work with the objects that I created.  Unlike Eddie's program, 
 this one uses objects as the pieces and board elements whereas his pieces and board 

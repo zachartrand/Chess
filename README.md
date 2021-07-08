@@ -12,7 +12,7 @@ You can clone the repository with the following terminal command:
 $ git clone https://github.com/zachartrand/Chess.git
 ```
 
-Or you can download the .zip file [here](archive/refs/heads/main.zip).
+Or you can download the .zip file [here](https://github.com/zachartrand/Refurbished-Website/archive/refs/heads/master.zip).
 
 #### Dependencies
 

@@ -1,6 +1,6 @@
-# Object-oriented chess engine.
+# Object-oriented chess engine
 
-<img src='images/screenshot.png' width='60%' alt='Chess Program Screenshot'>
+<img src='images/screenshot.png' width='60%' alt='Chess Program Screenshot' style="max-width: 70%;">
 
 ## Downloads
 
@@ -28,7 +28,7 @@ Instructions to download Pygame are here:  [Pygame: Getting Started](https://www
 
 Instructions to download NumPy are here: [Installing NumPy](https://numpy.org/install/)
 
-## How to run.
+## How to run
 
 This game uses [Python 3.8](https://www.python.org/downloads/release/python-3811/),
 [Pygame 2.0](https://www.pygame.org/wiki/GettingStarted), and [NumPy 1.20](https://numpy.org/install/).

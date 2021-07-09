@@ -11,7 +11,7 @@ You can download the latest release here:  [Latest release](https://github.com/z
 You can also clone the repository with the following terminal command:
 
 ```bash
-$ git clone https://github.com/zachartrand/Chess.git
+git clone https://github.com/zachartrand/Chess.git
 ```
 
 ### Dependencies
@@ -39,7 +39,7 @@ prompt window. If your Python distribution is through conda, be sure to
 have your conda environment activated before trying to load the main file.
 
 ```bash
-$ ipython chess_main.py
+ipython chess_main.py
 ```
 
 ## About

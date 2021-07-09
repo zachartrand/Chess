@@ -1,34 +1,34 @@
-## Object-oriented chess engine.
+# Object-oriented chess engine.
 
 <img src='images/screenshot.png' width='60%' alt='Chess Program Screenshot'>
 
-### Downloads
+## Downloads
 
-#### The game
+### The game
 
-You can clone the repository with the following terminal command:
+You can download the latest release here:  [Latest release](releases)
+
+You can also clone the repository with the following terminal command:
 
 ```bash
 $ git clone https://github.com/zachartrand/Chess.git
 ```
 
-Or you can download the .zip file [here](https://github.com/zachartrand/Chess/archive/refs/heads/main.zip).
+### Dependencies
 
-#### Dependencies
+#### Python
 
-##### Python
+Download the latest version here:  [Download Python](https://www.python.org/downloads/)
 
-Download the latest version [here](https://www.python.org/downloads/).
+#### Pygame
 
-##### Pygame
+Instructions to download Pygame are here:  [Pygame: Getting Started](https://www.pygame.org/wiki/GettingStarted)
 
-Download instructions here:  <https://www.pygame.org/wiki/GettingStarted>
+#### NumPy
 
-##### NumPy
+Instructions to download NumPy are here: [Installing NumPy](https://numpy.org/install/)
 
-Download instructions here: <https://numpy.org/install/>
-
-### How to run.
+## How to run.
 
 This game uses [Python 3.8](https://www.python.org/downloads/release/python-3811/),
 [Pygame 2.0](https://www.pygame.org/wiki/GettingStarted), and [NumPy 1.20](https://numpy.org/install/).
@@ -42,7 +42,7 @@ have your conda environment activated before trying to load the main file.
 $ ipython chess_main.py
 ```
 
-### About
+## About
 This game was designed for me to learn object oriented programming.  Since I 
 know the rules to Chess, I figured I could build objects based on aspects of 
 the game and make a working game from those objects.  I'm not sure if this is 
@@ -50,9 +50,9 @@ the most efficient way to make the game, but that isn't really the point of
 this exercise.
 
 The chess_engine and chess_main were made following the YouTube tutorial by Eddie 
-Sharick, found here:  
-    
-* <https://youtu.be/EnYui0e73Rs&list=PLBwF487qi8MGU81nDGaeNE1EnNEPYWKY_>
+Sharick, found here:
+
+- [Chess Engine in Python](https://youtu.be/EnYui0e73Rs&list=PLBwF487qi8MGU81nDGaeNE1EnNEPYWKY_)
     
 and then modified to work with the objects that I created.  Unlike Eddie's program, 
 this one uses objects as the pieces and board elements whereas his pieces and board 

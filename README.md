@@ -1,12 +1,12 @@
 # Object-oriented chess engine
 
-<img src='images/screenshot.png' width='60%' alt='Chess Program Screenshot' style="max-width: 70%;">
+<img src='images/screenshot.png' width="70%" alt='Chess Program Screenshot'>
 
 ## Downloads
 
 ### The game
 
-You can download the latest release here:  [Latest release](releases)
+You can download the latest release here:  [Latest release](https://github.com/zachartrand/Chess/releases)
 
 You can also clone the repository with the following terminal command:
 

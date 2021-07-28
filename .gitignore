@@ -1,0 +1,21 @@
+# Folders #
+###########
+
+## __pycache__ folder ##
+########################
+__pycache__/*
+
+## build folder ##
+##################
+build/*
+
+## dist folder ##
+#################
+dist/*
+
+# File types #
+##############
+
+## .spec ##
+###########
+*.spec

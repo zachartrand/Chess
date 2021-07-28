@@ -13,6 +13,12 @@ build/*
 #################
 dist/*
 
+## settings folder ##
+### This was going to save the user's settings for   ###
+### future games, but this was replaced by the menu. ###
+########################################################
+settings/*
+
 # File types #
 ##############
 

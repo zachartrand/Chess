@@ -25,3 +25,7 @@ settings/*
 ## .spec ##
 ###########
 *.spec
+
+# Files #
+#########
+requirements.txt

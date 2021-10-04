@@ -39,6 +39,10 @@ prompt window. If your Python distribution is through conda, be sure to
 have your conda environment activated before trying to load the main file.
 
 ```bash
+ipython -m chess_main
+```
+or
+```bash
 ipython chess_main.py
 ```
 
